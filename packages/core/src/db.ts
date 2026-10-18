@@ -38,7 +38,10 @@ async function migrate(client: ReturnType<typeof createClient>) {
     "write",
   );
   // Columns added after the first release.
-  for (const statement of [`ALTER TABLE threads ADD COLUMN preview TEXT NOT NULL DEFAULT ''`]) {
+  for (const statement of [
+    `ALTER TABLE threads ADD COLUMN preview TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE threads ADD COLUMN instructions TEXT NOT NULL DEFAULT ''`,
+  ]) {
     await client.execute(statement).catch(() => {});
   }
 }

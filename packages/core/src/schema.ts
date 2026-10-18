@@ -22,6 +22,8 @@ export const threads = sqliteTable(
     title: text("title").notNull().default("New thread"),
     /** Snippet of the latest assistant reply, shown under the title in the sidebar. */
     preview: text("preview").notNull().default(""),
+    /** Extra instructions the user added for this thread, sent as context with every message. */
+    instructions: text("instructions").notNull().default(""),
     /** Set when this thread built an app, or is chatting with an app's bot. */
     appId: text("app_id"),
     ...timestamps,

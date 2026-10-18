@@ -3,7 +3,7 @@
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
 import { AlertCircleIcon, SquareIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -50,6 +50,9 @@ export function AgentChat({
   sessionId,
   appId,
   onAppBuilt,
+  onThreadCreated,
+  instructions,
+  panelToggle,
   title,
 }: {
   readonly bot: ChatBot;
@@ -60,6 +63,12 @@ export function AgentChat({
   /** For app-bot threads: the app this bot belongs to. */
   readonly appId?: string;
   readonly onAppBuilt?: (app: BuiltApp) => void;
+  /** Called once a new thread is saved on its first message. */
+  readonly onThreadCreated?: (threadId: string) => void;
+  /** Extra instructions the user set for this thread, sent as context with every message. */
+  readonly instructions?: string;
+  /** Button that opens the thread's side panel, pinned to the top right. */
+  readonly panelToggle?: ReactNode;
 }) {
   const AGENT_NAME = bot.name;
   const [cancellationError, setCancellationError] = useState<string>();
@@ -68,6 +77,15 @@ export function AgentChat({
   const threadId = useRef(initialThreadId);
   const firstMessage = useRef<string>("");
   const creatingThread = useRef<Promise<void> | undefined>(undefined);
+
+  const savePreview = (preview: string) => {
+    if (!threadId.current || !preview) return;
+    void fetch(`/api/threads/${threadId.current}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preview: preview.slice(0, 200) }),
+    }).then(refreshSidebar);
+  };
 
   /** Persist the thread the first time eve hands us a session id, then move the URL to it. */
   const ensureThread = (nextSessionId: string) => {
@@ -92,12 +110,15 @@ export function AgentChat({
         agent: bot.agent,
         sessionId: nextSessionId,
         title: title || firstMessage.current.slice(0, 80) || bot.name,
+        preview: latestText.current.slice(0, 200),
+        instructions: instructions?.trim() || undefined,
         appId,
       }),
     })
       .then((r) => r.json())
       .then(({ thread }) => {
         threadId.current = thread.id;
+        onThreadCreated?.(thread.id);
         // Framework routers patch window.history; navigating through them would
         // remount this route and detach the active stream.
         History.prototype.replaceState.call(window.history, window.history.state, "", `/t/${thread.id}`);
@@ -121,29 +142,21 @@ export function AgentChat({
       }
     },
     onFinish() {
-      if (threadId.current) {
-        void fetch(`/api/threads/${threadId.current}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ preview: latestReply.current.slice(0, 200) }),
-        }).then(refreshSidebar);
-      }
+      savePreview(latestText.current);
     },
   });
 
-  // Latest assistant text, saved as the thread's sidebar preview when a turn finishes.
-  const latestReply = useRef("");
+  // Text of the latest message from either side, saved as the thread's sidebar preview
+  // when the user sends and again when a turn finishes.
+  const latestText = useRef("");
   useEffect(() => {
     for (const message of agent.data.messages.toReversed()) {
-      if (message.role !== "assistant") continue;
-      const text = message.parts
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join(" ")
-        .replace(/[#*_`>\[\]]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
+      if (message.role !== "assistant" && message.role !== "user") continue;
+      const text = toPreviewText(
+        message.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(" "),
+      );
       if (text) {
-        latestReply.current = text;
+        latestText.current = text;
         break;
       }
     }
@@ -213,15 +226,25 @@ export function AgentChat({
     setCancellationError(undefined);
     hasSubmittedMessage.current = true;
     if (!firstMessage.current) firstMessage.current = text;
+    latestText.current = toPreviewText(text) || "📎 Attachment";
+    // Existing threads get the preview now; a new thread carries it in its create request.
+    savePreview(latestText.current);
     if (agent.session !== undefined) ensureThread(agent.session.sessionId);
     // An app's bot sees the app's on-device data on every turn; it never leaves the device otherwise.
     // A new Builder thread carries the name the user picked for the app.
-    const clientContext = appId
-      ? `App context (on-device data snapshot):\n${JSON.stringify({ appId, data: await appDataSnapshot(appId) })}`
-      : bot.agent === "builder" && title && isEmpty
-        ? `The user named this application "${title}". Use exactly that as the app name.`
-        : undefined;
-    const options = { ...(isBusy ? { turnPolicy: "steer" as const } : {}), ...(clientContext ? { clientContext } : {}) };
+    // The user's extra instructions for this thread ride along with every message.
+    const clientContext = [
+      appId
+        ? `App context (on-device data snapshot):\n${JSON.stringify({ appId, data: await appDataSnapshot(appId) })}`
+        : bot.agent === "builder" && title && isEmpty
+          ? `The user named this application "${title}". Use exactly that as the app name.`
+          : undefined,
+      instructions?.trim() ? `Additional instructions from the user for this thread:\n${instructions.trim()}` : undefined,
+    ].filter((context) => context !== undefined);
+    const options = {
+      ...(isBusy ? { turnPolicy: "steer" as const } : {}),
+      ...(clientContext.length > 0 ? { clientContext } : {}),
+    };
 
     if (message.files.length === 0) {
       await agent.send(text, options);
@@ -268,6 +291,9 @@ export function AgentChat({
 
   return (
     <main className="relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
+      {panelToggle ? (
+        <div className="absolute top-2.5 right-3 z-30 [-webkit-app-region:no-drag]">{panelToggle}</div>
+      ) : null}
       {showConversationLayout ? (
         <ChatHeader bot={bot} title={title} />
       ) : null}
@@ -430,6 +456,14 @@ function PendingThinking({ icon }: { readonly icon: string }) {
       </MessageContent>
     </Message>
   );
+}
+
+/** Plain one-line text for the sidebar: markdown punctuation stripped, whitespace collapsed. */
+function toPreviewText(text: string): string {
+  return text
+    .replace(/[#*_`>\[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function toErrorMessage(error: unknown): string {

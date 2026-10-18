@@ -1,5 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getThread } from "@/lib/server/data";
 import { HttpError, requireUser, route } from "@/lib/server/user";
@@ -16,6 +16,7 @@ export const GET = route(async (request: Request, { params }: Params) => {
 const updateThread = z.object({
   title: z.string().min(1).max(120).optional(),
   preview: z.string().max(200).optional(),
+  instructions: z.string().max(4000).optional(),
   sessionId: z.string().optional(),
   appId: z.string().nullable().optional(),
 });
@@ -23,10 +24,13 @@ const updateThread = z.object({
 export const PATCH = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
   const { id } = await params;
+  const input = updateThread.parse(await request.json());
+  // Editing a thread's instructions alone shouldn't move it to the top of the sidebar.
+  const instructionsOnly = Object.keys(input).every((key) => key === "instructions");
   const db = await getDb();
   const [thread] = await db
     .update(schema.threads)
-    .set({ ...updateThread.parse(await request.json()), updatedAt: new Date() })
+    .set({ ...input, updatedAt: instructionsOnly ? sql`${schema.threads.updatedAt}` : new Date() })
     .where(and(eq(schema.threads.id, id), eq(schema.threads.userId, user.id)))
     .returning();
   if (!thread) throw new HttpError(404, "Thread not found");

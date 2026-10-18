@@ -13,6 +13,8 @@ const createThread = z.object({
   agent: z.string().min(1),
   sessionId: z.string().optional(),
   title: z.string().max(120).optional(),
+  preview: z.string().max(200).optional(),
+  instructions: z.string().max(4000).optional(),
   appId: z.string().optional(),
 });
 

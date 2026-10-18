@@ -15,6 +15,7 @@ export default async function ThreadPage({ params }: { readonly params: Promise<
       appId={thread.agent === "app-bot" ? (thread.appId ?? undefined) : undefined}
       bot={chatBot(thread.agent, app)}
       buildThreadId={buildThread?.id}
+      instructions={thread.instructions}
       sessionId={thread.sessionId ?? undefined}
       spaceApp={app}
       threadId={thread.id}

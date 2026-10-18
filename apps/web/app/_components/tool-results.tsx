@@ -39,7 +39,7 @@ function AppReadyCard({ output }: { readonly output: Extract<PackageResult, { ok
       </div>
       <Button
         onClick={() =>
-          space.open({ id: output.appId, name: output.name, icon: output.icon, currentVersion: output.version })
+          space.open({ id: output.appId, name: output.name, icon: output.icon, description: "", currentVersion: output.version })
         }
         size="sm"
       >

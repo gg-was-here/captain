@@ -1,21 +1,22 @@
 "use client";
 
-import type { App } from "@captain/core/schema";
+import { PanelRightCloseIcon, PanelRightIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { roundButton } from "@/lib/utils";
 import { AgentChat, type BuiltApp, type ChatBot } from "./agent-chat";
-import { Space, SpaceContext } from "./space";
+import { type SpaceApp, SpaceContext } from "./space";
+import { ThreadPanel } from "./thread-panel";
 
-type SpaceApp = Pick<App, "id" | "name" | "icon" | "currentVersion">;
-
-/** A thread: the chat, plus the Space panel whenever the thread has an app. */
+/** A thread: the chat, plus the side panel (bot info and computer, or the thread's app). */
 export function ThreadView({
   bot,
-  threadId,
+  threadId: initialThreadId,
   sessionId,
   appId,
   spaceApp: initialSpaceApp,
   buildThreadId,
   title,
+  instructions: initialInstructions = "",
 }: {
   readonly bot: ChatBot;
   readonly threadId?: string;
@@ -25,38 +26,69 @@ export function ThreadView({
   readonly buildThreadId?: string | null;
   /** The thread's name, as chosen when it was created. */
   readonly title?: string;
+  /** Extra instructions the user saved for this thread. */
+  readonly instructions?: string;
 }) {
   const [spaceApp, setSpaceApp] = useState<SpaceApp | null>(
     initialSpaceApp && initialSpaceApp.currentVersion > 0 ? initialSpaceApp : null,
   );
-  const [editThreadId, setEditThreadId] = useState(buildThreadId ?? threadId ?? null);
+  const kind = bot.agent === "builder" || bot.agent === "app-bot" || spaceApp ? "application" : "message";
+  // Application threads open with the app showing; message threads start with the panel closed.
+  const [panelOpen, setPanelOpen] = useState(kind === "application");
+  const [threadId, setThreadId] = useState(initialThreadId ?? null);
+  const [instructions, setInstructions] = useState(initialInstructions);
+  const [editThreadId, setEditThreadId] = useState(buildThreadId ?? initialThreadId ?? null);
 
+  const openApp = useCallback((app: SpaceApp) => {
+    setSpaceApp(app);
+    setPanelOpen(true);
+  }, []);
   const onAppBuilt = useCallback(
     (app: BuiltApp) => {
-      setSpaceApp({ id: app.appId, name: app.name, icon: app.icon, currentVersion: app.version });
+      openApp({ id: app.appId, name: app.name, icon: app.icon, description: "", currentVersion: app.version });
       if (bot.agent === "builder" && threadId) setEditThreadId(threadId);
     },
-    [bot.agent, threadId],
+    [bot.agent, threadId, openApp],
   );
-  const space = useMemo(() => ({ open: setSpaceApp }), []);
+  const space = useMemo(() => ({ open: openApp }), [openApp]);
+
+  const PanelIcon = panelOpen ? PanelRightCloseIcon : PanelRightIcon;
 
   return (
     <SpaceContext.Provider value={space}>
       <AgentChat
         appId={appId}
         bot={bot}
-        key={`${bot.agent}:${threadId ?? "new"}:${appId ?? ""}`}
+        instructions={instructions}
+        key={`${bot.agent}:${initialThreadId ?? "new"}:${appId ?? ""}`}
         onAppBuilt={onAppBuilt}
+        onThreadCreated={setThreadId}
+        panelToggle={
+          <button
+            aria-label={panelOpen ? "Close side panel" : "Open side panel"}
+            className={roundButton}
+            onClick={() => setPanelOpen((open) => !open)}
+            type="button"
+          >
+            <PanelIcon className="size-4" />
+          </button>
+        }
         sessionId={sessionId}
-        threadId={threadId}
+        threadId={initialThreadId}
         title={title}
       />
-      {spaceApp ? (
-        <Space
+      {panelOpen ? (
+        <ThreadPanel
           app={spaceApp}
+          avatarSeed={bot.agent + (appId ?? spaceApp?.id ?? "")}
+          bot={bot}
           buildThreadId={bot.agent === "builder" ? null : editThreadId}
-          key={`${spaceApp.id}@${spaceApp.currentVersion}`}
-          onClose={() => setSpaceApp(null)}
+          instructions={instructions}
+          kind={kind}
+          onClose={() => setPanelOpen(false)}
+          onInstructionsChange={setInstructions}
+          threadId={threadId}
+          title={title}
         />
       ) : null}
     </SpaceContext.Provider>

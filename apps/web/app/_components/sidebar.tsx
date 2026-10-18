@@ -7,27 +7,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { onRefreshSidebar } from "@/lib/client/events";
-import { cn } from "@/lib/utils";
+import { avatarColor, cn, roundButton } from "@/lib/utils";
 import { NewThreadMenu } from "./new-thread-dialog";
 
 const botByAgent = new Map(SYSTEM_BOTS.map((bot) => [bot.agent, bot]));
 
-/** Soft, stable avatar colors so each thread is recognizable at a glance. */
-const AVATAR_COLORS = [
-  "bg-violet-500/15",
-  "bg-sky-500/15",
-  "bg-emerald-500/15",
-  "bg-rose-500/15",
-  "bg-amber-500/15",
-  "bg-teal-500/15",
-  "bg-indigo-500/15",
-  "bg-lime-500/15",
-];
+/** Longest last-message snippet shown under a thread's title. */
+const PREVIEW_CHARS = 40;
 
-function avatarColor(seed: string) {
-  let hash = 0;
-  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+function clip(text: string, max: number) {
+  return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
 }
 
 export function Sidebar() {
@@ -155,7 +144,7 @@ export function Sidebar() {
                   <span className="min-w-0 flex-1 pr-5">
                     <span className="block truncate font-medium">{thread.title}</span>
                     <span className="block truncate text-muted-foreground text-xs">
-                      {thread.preview || botByAgent.get(thread.agent)?.name || app?.name || "New thread"}
+                      {thread.preview ? clip(thread.preview, PREVIEW_CHARS) : "No messages yet"}
                     </span>
                   </span>
                 </Link>
@@ -195,6 +184,3 @@ export function Sidebar() {
     </aside>
   );
 }
-
-const roundButton =
-  "flex size-9 items-center justify-center rounded-full border bg-background text-foreground/80 shadow-xs transition-colors hover:bg-accent hover:text-foreground";
