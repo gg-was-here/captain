@@ -1,0 +1,31 @@
+{
+  "name": "@captain/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db": "./src/db.ts",
+    "./schema": "./src/schema.ts",
+    "./bundles": "./src/bundles.ts",
+    "./bots": "./src/bots.ts",
+    "./connectors": "./src/connectors/index.ts",
+    "./eve": "./src/eve.ts",
+    "./auth": "./src/auth.ts",
+    "./tools/*": "./src/tools/*.ts",
+    "./channel": "./src/channel.ts",
+    "./peers": "./src/peers.ts"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.25.0",
+    "@libsql/client": "^0.18.0",
+    "@vercel/blob": "^2.8.2",
+    "@vercel/connect": "2.5.2",
+    "drizzle-orm": "^0.45.4",
+    "nanoid": "^5.1.11",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11"
+  }
+}

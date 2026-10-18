@@ -1,0 +1,23 @@
+{
+  "name": "@captain/desktop",
+  "productName": "Captain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Captain for Mac",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && CAPTAIN_URL=${CAPTAIN_URL:-http://localhost:3000} electron .",
+    "dist": "npm run build && electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "captainUrl": "https://captain.app"
+}

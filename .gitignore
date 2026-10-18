@@ -8,3 +8,7 @@ node_modules
 dist
 .DS_Store
 *.tsbuildinfo
+.venv/
+.idea/
+.data/
+apps/desktop/release/

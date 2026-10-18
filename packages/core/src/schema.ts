@@ -1,0 +1,68 @@
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+const timestamps = {
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date())
+    .$onUpdateFn(() => new Date()),
+};
+
+/** A chat thread: one durable eve session with one bot. */
+export const threads = sqliteTable(
+  "threads",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    /** eve workspace agent name, e.g. `captain`, `slack`, `app-bot`. */
+    agent: text("agent").notNull(),
+    sessionId: text("session_id"),
+    title: text("title").notNull().default("New thread"),
+    /** Snippet of the latest assistant reply, shown under the title in the sidebar. */
+    preview: text("preview").notNull().default(""),
+    /** Set when this thread built an app, or is chatting with an app's bot. */
+    appId: text("app_id"),
+    ...timestamps,
+  },
+  (t) => [index("threads_user_idx").on(t.userId, t.updatedAt)],
+);
+
+/** An app built by the builder bot. The bundle itself is stored on device. */
+export const apps = sqliteTable(
+  "apps",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    icon: text("icon").notNull().default("✨"),
+    /** Thread where the app was built. */
+    threadId: text("thread_id"),
+    /** Connectors the app may call through the captain SDK (user approves on first launch). */
+    connectors: text("connectors", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** Collections the app stores in its local database, with a short field description. */
+    dataSchema: text("data_schema", { mode: "json" })
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    currentVersion: integer("current_version").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index("apps_user_idx").on(t.userId)],
+);
+
+export const appVersions = sqliteTable("app_versions", {
+  id: text("id").primaryKey(),
+  appId: text("app_id").notNull(),
+  version: integer("version").notNull(),
+  /** Key in bundle storage (Vercel Blob in production, `.data/bundles` locally). */
+  bundleKey: text("bundle_key").notNull(),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamps.createdAt,
+});
+
+export type Thread = typeof threads.$inferSelect;
+export type App = typeof apps.$inferSelect;
+export type AppVersion = typeof appVersions.$inferSelect;

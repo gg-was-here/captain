@@ -1,35 +1,72 @@
-# captain
+# Captain
 
-This is an [eve](https://eve.dev) agent bootstrapped with [`eve init`](https://eve.dev/docs/reference/cli#eve-init).
+A Mac app for chatting with bots that work inside your Slack, Gmail and Notion. Bots can also build small apps that are stored and run on your Mac.
 
-## Getting started
-
-First, run the development server:
-
-```bash
-eve dev
+```
+Captain.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js, apps/web) ──mounts──▶ Bots (eve, agents/*)
+   └─ Space: built apps run from disk                         │                                   │
+      over captain-app://, with the window.captain bridge     └─ Turso/SQLite · Vercel Blob        └─ Vercel Connect · Vercel Sandbox
 ```
 
-The development TUI opens an interactive session where you can send messages to your agent.
+| Path | What it is |
+| --- | --- |
+| `agents/captain` | Default bot. Searches the web and delegates to the other bots. |
+| `agents/slack`, `agents/gmail`, `agents/notion` | One bot per connector. Tokens are per user, through Vercel Connect. |
+| `agents/builder` | Builds apps in a Vercel Sandbox (`create_app` → code → `package_app`). |
+| `agents/app-bot` | The bot for each built app. Reads the app's on-device data and proposes changes to it. |
+| `packages/core` | Shared DB schema, auth, connector clients and bot tools. |
+| `packages/app-template` | Starter every app is built from, including the `captain` SDK (`src/captain.ts`). Run `npm run sync-template` after editing it. |
+| `apps/web` | Threads, sidebar, Space panel, settings, and the runtime APIs that built apps call. |
+| `apps/desktop` | Electron shell. Downloads app bundles into `~/Library/Application Support/Captain/apps`, keeps each app's data in SQLite, and enforces per-app connector permissions. |
 
-Start by editing `agent/instructions.md` to define the agent's identity, purpose, tone, and response guidelines. Configure its model and runtime behavior in `agent/agent.ts`.
+## How an app gets built
+1. In a thread, you ask Builder for something, e.g. "build a task tracker from my Slack messages".
+2. Builder looks at real Slack data, then writes a Vite + React app in its sandbox and runs `package_app`, which type-checks and builds it.
+3. The new version shows up as a **Launch** card in the thread, and the Space opens. The Mac app downloads the bundle and runs it from disk. Reopening the thread reopens the Space.
+4. While it runs, the app can only reach the outside world through `window.captain`:
+   - **Local data:** SQLite.
+   - **AI:** `/api/runtime/ai`.
+   - **Connectors:** `/api/runtime/connectors`, limited to the connectors you approved for that app. Write actions ask you to confirm first.
+5. **Ask app** opens the app's own bot. **Edit app** returns to the Builder thread.
 
-Add capabilities under `agent/`, including tools, connections, channels, skills, subagents, and schedules. eve reloads your changes as you work.
-
-## Learn more
-
-To learn more about eve, explore these resources:
-
-- [eve documentation](https://eve.dev/docs) — learn about eve's features and authoring APIs.
-- [Build an Agent tutorial](https://eve.dev/docs/tutorial/first-agent) — build and deploy an agent step by step.
-- [eve on GitHub](https://github.com/vercel/eve) — view the source and contribute.
-
-## Deploy on Vercel
-
-Deploy your agent to [Vercel](https://vercel.com) from the project root:
+## Run locally
+Node 24 is pinned in `.node-version`.
 
 ```bash
-eve deploy
+npm install
+npm run dev        # web UI + all bots at http://localhost:3000
+npm run desktop    # Captain.app pointed at localhost (in another terminal)
 ```
 
-`eve deploy` links a Vercel project if needed and deploys the agent to production. See the [eve deployment documentation](https://eve.dev/docs/guides/deployment/vercel) for authentication, environment variables, and deployment options.
+Without Clerk keys, local dev runs as a single `local-user`, and data goes to `.data/captain.db`.
+
+### One-time setup (needed for models, connectors and Builder)
+1. **Vercel:** run `npm i -g vercel && vercel login && vercel link`, then `vercel env pull .env.local`. This provides the AI Gateway and OIDC credentials that models, Vercel Connect and Vercel Sandbox need. `npm run dev` loads `.env.local` automatically.
+2. **Connectors** (from the repo root):
+   - `vercel connect create slack --name captain`
+   - `vercel connect create https://mcp.notion.com/mcp`
+   - Register a Google OAuth client (Gmail scopes) with `vercel connect create`.
+
+   If the generated IDs differ from `slack/captain`, `google/captain` and `notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`. Then finish setting up the Notion bot: `cd agents/notion && npx eve add connection/notion --non-interactive`.
+3. **Production services** (Vercel Marketplace):
+   - Turso: `DATABASE_URL`, `TURSO_AUTH_TOKEN`
+   - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+   - Vercel Blob: `BLOB_READ_WRITE_TOKEN`
+4. **Deploy:** run `vercel deploy`. `withEve` deploys the web app and every bot as one project.
+
+### Ship the Mac app
+Set `captainUrl` in `apps/desktop/package.json` to your deployment URL. Then build:
+
+```bash
+export CSC_LINK=… CSC_KEY_PASSWORD=…                         # Developer ID Application certificate
+export APPLE_ID=… APPLE_APP_SPECIFIC_PASSWORD=… APPLE_TEAM_ID=…
+export CAPTAIN_UPDATES_URL=https://…/desktop                  # where release/*.zip + latest-mac.yml are hosted
+npm run desktop:dist                                          # → apps/desktop/release/Captain-<version>-arm64.dmg
+```
+
+Gmail's read scopes are *restricted*. A public launch needs Google's OAuth verification and a CASA security assessment, so start that early. Until then, test users work.
+
+## Next milestones
+- **Computer bot:** a Vercel Sandbox desktop streamed into the Space (`eve/computer-use`).
+- **Google Calendar, Drive, Docs and Sheets bots.**
+- **Scheduled bots** (eve schedules), such as a daily digest.
