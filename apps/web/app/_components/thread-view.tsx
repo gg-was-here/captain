@@ -15,6 +15,7 @@ export function ThreadView({
   appId,
   spaceApp: initialSpaceApp,
   buildThreadId,
+  title,
 }: {
   readonly bot: ChatBot;
   readonly threadId?: string;
@@ -22,6 +23,8 @@ export function ThreadView({
   readonly appId?: string;
   readonly spaceApp?: SpaceApp | null;
   readonly buildThreadId?: string | null;
+  /** The thread's name, as chosen when it was created. */
+  readonly title?: string;
 }) {
   const [spaceApp, setSpaceApp] = useState<SpaceApp | null>(
     initialSpaceApp && initialSpaceApp.currentVersion > 0 ? initialSpaceApp : null,
@@ -46,6 +49,7 @@ export function ThreadView({
         onAppBuilt={onAppBuilt}
         sessionId={sessionId}
         threadId={threadId}
+        title={title}
       />
       {spaceApp ? (
         <Space

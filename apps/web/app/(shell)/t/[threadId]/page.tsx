@@ -18,6 +18,7 @@ export default async function ThreadPage({ params }: { readonly params: Promise<
       sessionId={thread.sessionId ?? undefined}
       spaceApp={app}
       threadId={thread.id}
+      title={thread.title}
     />
   );
 }

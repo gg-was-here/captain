@@ -2,19 +2,13 @@
 
 import { SYSTEM_BOTS } from "@captain/core/bots";
 import type { App, Thread } from "@captain/core/schema";
-import { PlusIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { onRefreshSidebar } from "@/lib/client/events";
 import { cn } from "@/lib/utils";
+import { NewThreadMenu } from "./new-thread-dialog";
 
 const botByAgent = new Map(SYSTEM_BOTS.map((bot) => [bot.agent, bot]));
 
@@ -104,25 +98,7 @@ export function Sidebar() {
         >
           {searching ? <XIcon className="size-4" /> : <SearchIcon className="size-4" />}
         </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger aria-label="New chat" className={roundButton}>
-            <PlusIcon className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel className="text-muted-foreground text-xs">New chat with</DropdownMenuLabel>
-            {SYSTEM_BOTS.map((bot) => (
-              <DropdownMenuItem asChild key={bot.agent}>
-                <Link className="flex items-start gap-2.5" href={`/new?bot=${bot.agent}`}>
-                  <span className="text-base leading-5">{bot.icon}</span>
-                  <span className="flex flex-col">
-                    <span className="font-medium">{bot.name}</span>
-                    <span className="text-muted-foreground text-xs">{bot.tagline}</span>
-                  </span>
-                </Link>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NewThreadMenu className={roundButton} />
       </div>
 
       {searching ? (

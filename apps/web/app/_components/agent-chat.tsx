@@ -2,7 +2,7 @@
 
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, SquareIcon } from "lucide-react";
+import { AlertCircleIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   Conversation,
@@ -19,11 +19,13 @@ import {
   PromptInputTextarea,
   usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
-import { Shimmer } from "@/components/ai-elements/shimmer";
 import { cn } from "@/lib/utils";
 import { appDataSnapshot } from "@/lib/client/app-data";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { refreshSidebar } from "@/lib/client/events";
 import { AgentMessage } from "./agent-message";
+import { AttachButton, AttachmentChips, MicButton } from "./composer-buttons";
+import { NewThreadMenu } from "./new-thread-dialog";
 
 export interface ChatBot {
   readonly agent: string;
@@ -31,6 +33,8 @@ export interface ChatBot {
   readonly icon: string;
   readonly tagline: string;
   readonly suggestions?: readonly string[];
+  /** Text-only welcome shown on an empty thread instead of the icon and tagline. */
+  readonly intro?: string;
 }
 
 export interface BuiltApp {
@@ -46,8 +50,11 @@ export function AgentChat({
   sessionId,
   appId,
   onAppBuilt,
+  title,
 }: {
   readonly bot: ChatBot;
+  /** Name the user gave this thread; used instead of the first message as its title. */
+  readonly title?: string;
   readonly threadId?: string;
   readonly sessionId?: string;
   /** For app-bot threads: the app this bot belongs to. */
@@ -64,14 +71,27 @@ export function AgentChat({
 
   /** Persist the thread the first time eve hands us a session id, then move the URL to it. */
   const ensureThread = (nextSessionId: string) => {
-    if (threadId.current || creatingThread.current) return;
+    if (creatingThread.current) return;
+    if (threadId.current) {
+      // Threads created from the + menu exist before their session; attach it on the first message.
+      if (sessionId === undefined) {
+        creatingThread.current = fetch(`/api/threads/${threadId.current}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId: nextSessionId }),
+        }).then(() => {
+          refreshSidebar();
+        });
+      }
+      return;
+    }
     creatingThread.current = fetch("/api/threads", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         agent: bot.agent,
         sessionId: nextSessionId,
-        title: firstMessage.current.slice(0, 80) || bot.name,
+        title: title || firstMessage.current.slice(0, 80) || bot.name,
         appId,
       }),
     })
@@ -159,14 +179,15 @@ export function AgentChat({
   const lastMessage = agent.data.messages.at(-1);
   const isPendingAssistantShell =
     lastMessage?.role === "assistant" &&
-    lastMessage.parts.every((part) => part.type === "step-start");
+    lastMessage.parts.every((part) => part.type === "step-start" || part.type === "reasoning");
   const showPendingThinking =
     isBusy &&
     (agent.status === "submitted" || lastMessage?.role !== "assistant" || isPendingAssistantShell);
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
-  const showConversationLayout = isResuming || hasConversationContent;
+  // A saved thread always opens as a chat: its name on top, the composer at the bottom.
+  const showConversationLayout = isResuming || hasConversationContent || initialThreadId !== undefined;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
   // Answers are accepted while work runs; the server's settlement closes each request.
   const canRespond = (requestId: string) =>
@@ -194,9 +215,12 @@ export function AgentChat({
     if (!firstMessage.current) firstMessage.current = text;
     if (agent.session !== undefined) ensureThread(agent.session.sessionId);
     // An app's bot sees the app's on-device data on every turn; it never leaves the device otherwise.
+    // A new Builder thread carries the name the user picked for the app.
     const clientContext = appId
       ? `App context (on-device data snapshot):\n${JSON.stringify({ appId, data: await appDataSnapshot(appId) })}`
-      : undefined;
+      : bot.agent === "builder" && title && isEmpty
+        ? `The user named this application "${title}". Use exactly that as the app name.`
+        : undefined;
     const options = { ...(isBusy ? { turnPolicy: "steer" as const } : {}), ...(clientContext ? { clientContext } : {}) };
 
     if (message.files.length === 0) {
@@ -220,13 +244,19 @@ export function AgentChat({
     await agent.send(parts, options);
   };
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composer = (
-    <PromptInput onSubmit={handleSubmit}>
+    <PromptInput className="flex-wrap rounded-3xl" multiple onSubmit={handleSubmit}>
+      <AttachmentChips />
+      <AttachButton />
       <PromptInputTextarea
+        className="max-h-40 min-h-11 py-3 pr-22 pl-12"
         disabled={isResuming}
+        ref={textareaRef}
         onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
         placeholder="Send a message…"
       />
+      <MicButton textareaRef={textareaRef} />
       <ComposerAction
         hasInputText={hasInputText}
         isBusy={isBusy}
@@ -239,7 +269,7 @@ export function AgentChat({
   return (
     <main className="relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       {showConversationLayout ? (
-        <ChatHeader bot={bot} />
+        <ChatHeader bot={bot} title={title} />
       ) : null}
 
       {showConversationLayout ? (
@@ -254,7 +284,7 @@ export function AgentChat({
           }
         >
           <ConversationTopFade className="top-14" />
-          <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-20 pb-36 sm:px-6">
+          <ConversationContent className="mx-auto w-full max-w-3xl gap-3 px-4 pt-20 pb-36 sm:px-6">
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
               isPendingAssistantShell &&
@@ -274,7 +304,7 @@ export function AgentChat({
                 />
               ),
             )}
-            {showPendingThinking ? <PendingThinking /> : null}
+            {showPendingThinking ? <PendingThinking icon={bot.icon} /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
           <ConversationScrollButton />
@@ -289,14 +319,25 @@ export function AgentChat({
             : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
         )}
       >
-        {showConversationLayout ? null : (
+        {showConversationLayout ? null : bot.intro ? (
+          // The home screen starts chats through the + menu rather than a composer.
+          <div className="flex flex-col items-center gap-3 text-center">
+            <h1 className="font-medium text-4xl tracking-tighter">{AGENT_NAME}</h1>
+            <p className="max-w-md text-balance text-muted-foreground">{bot.intro}</p>
+            <NewThreadMenu
+              align="center"
+              className="mt-5 flex size-12 items-center justify-center rounded-full border bg-background text-foreground/80 shadow-xs transition-colors hover:bg-accent hover:text-foreground"
+              iconClassName="size-5"
+            />
+          </div>
+        ) : (
           <div className="flex flex-col items-center gap-3 text-center">
             <span className="text-5xl">{bot.icon}</span>
             <h1 className="font-medium text-4xl tracking-tighter">{AGENT_NAME}</h1>
             <p className="max-w-sm text-muted-foreground text-sm">{bot.tagline}</p>
           </div>
         )}
-        <div className="w-full">{composer}</div>
+        {showConversationLayout || !bot.intro ? <div className="w-full">{composer}</div> : null}
         {showConversationLayout || !bot.suggestions?.length ? null : (
           <div className="flex flex-wrap justify-center gap-2">
             {bot.suggestions.map((suggestion) => (
@@ -331,13 +372,13 @@ function ComposerAction({
   const canSubmit = hasInputText || attachments.files.length > 0;
 
   if (!isBusy || canSubmit) {
-    return <PromptInputSubmit disabled={isResuming} />;
+    return <PromptInputSubmit className="right-1.5 bottom-1.5 size-8 bg-teal-600 text-white hover:bg-teal-700" disabled={isResuming} />;
   }
 
   return (
     <PromptInputButton
       aria-label="Stop"
-      className="absolute right-2.5 bottom-2.5"
+      className="absolute right-1.5 bottom-1.5 size-8 rounded-full"
       onClick={onCancel}
       variant="outline"
     >
@@ -365,24 +406,26 @@ function ErrorMessage({ message }: { readonly message: string }) {
   );
 }
 
-function ChatHeader({ bot }: { readonly bot: ChatBot }) {
+function ChatHeader({ bot, title }: { readonly bot: ChatBot; readonly title?: string }) {
   return (
-    <header className="pointer-events-none absolute top-0 right-0 left-0 z-20 h-12 [-webkit-app-region:drag]">
-      <div className="relative mx-auto flex h-full w-full max-w-3xl items-center justify-center gap-2 bg-background px-24">
-        <span>{bot.icon}</span>
-        <span className="truncate text-muted-foreground text-sm">{bot.name}</span>
+    <header className="pointer-events-none absolute top-0 right-0 left-0 z-20 flex h-14 items-center justify-center [-webkit-app-region:drag]">
+      {/* A floating pill with the chat's avatar and name, as in a messaging app. */}
+      <div className="flex max-w-[60%] items-center gap-2 rounded-full border bg-background/90 py-1.5 pr-4 pl-1.5 shadow-sm backdrop-blur-md">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{bot.icon}</span>
+        <span className="truncate font-medium text-sm">{title || bot.name}</span>
       </div>
     </header>
   );
 }
 
-function PendingThinking() {
+/** Shown while a reply is on its way: the bot's avatar and a soft "Working on it". */
+function PendingThinking({ icon }: { readonly icon: string }) {
   return (
     <Message aria-live="polite" from="assistant">
       <MessageContent>
-        <div className="mb-4 flex w-full items-center gap-2 text-muted-foreground text-sm">
-          <BrainIcon className="size-4" />
-          <Shimmer duration={1}>Thinking</Shimmer>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{icon}</span>
+          <Shimmer duration={1.5}>Working on it</Shimmer>
         </div>
       </MessageContent>
     </Message>

@@ -18,7 +18,6 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import {
   BashToolContent,
   Tool,
@@ -68,10 +67,6 @@ export function AgentMessage({
     (last, part, index) => (part.type === "text" ? index : last),
     -1,
   );
-  const hasAssistantText =
-    message.role === "assistant" &&
-    message.parts.some((part) => part.type === "text" && part.text.length > 0);
-
   return (
     <Message
       data-optimistic={message.metadata?.optimistic ? "true" : undefined}
@@ -79,7 +74,8 @@ export function AgentMessage({
     >
       <MessageContent>
         {message.parts.map((part, index) =>
-          hasAssistantText && part.type === "reasoning" ? null : (
+          // Model reasoning is never shown; the chat shows only a pending indicator while it runs.
+          part.type === "reasoning" ? null : (
             <AgentMessagePart
               canRespond={canRespond}
               key={partKey(part, index)}
@@ -87,6 +83,7 @@ export function AgentMessage({
               part={part}
               questionsFor={questionsFor}
               showCaret={isStreaming && message.role === "assistant" && index === lastTextIndex}
+              textBubble={message.role === "assistant"}
             />
           ),
         )}
@@ -101,29 +98,34 @@ function AgentMessagePart({
   part,
   questionsFor,
   showCaret,
+  textBubble,
 }: {
   readonly canRespond: (requestId: string) => boolean;
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
   readonly part: EveMessagePart;
   readonly questionsFor: (callId: string) => readonly ConversationInput[];
   readonly showCaret: boolean;
+  /** Wrap assistant text in a chat bubble; user text already sits in one. */
+  readonly textBubble: boolean;
 }) {
   switch (part.type) {
     case "step-start":
+    case "reasoning":
       return null;
-    case "text":
-      return (
+    case "text": {
+      const response = (
         <MessageResponse caret="block" isAnimating={showCaret}>
           {part.text}
         </MessageResponse>
       );
-    case "reasoning":
+      if (!textBubble) return response;
+      if (!part.text) return null;
       return (
-        <Reasoning defaultOpen isStreaming={part.state === "streaming"}>
-          <ReasoningTrigger />
-          <ReasoningContent>{part.text}</ReasoningContent>
-        </Reasoning>
+        <div className="w-fit max-w-[75%] rounded-[18px] bg-muted px-3.5 py-2 text-foreground">
+          {response}
+        </div>
       );
+    }
     case "file":
       return <AttachmentPart part={part} />;
     case "authorization":

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
 import { requireUser, route } from "@/lib/server/user";
 
-const RUNTIME_MODEL = process.env.CAPTAIN_APP_MODEL ?? "anthropic/claude-haiku-5.5";
+const RUNTIME_MODEL = process.env.CAPTAIN_APP_MODEL ?? "nvidia/nemotron-3.5-lightning-free";
 
 const body = z.object({
   appId: z.string(),
