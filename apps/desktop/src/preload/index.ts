@@ -9,6 +9,7 @@ type Bounds = { x: number; y: number; width: number; height: number };
 contextBridge.exposeInMainWorld("captainDesktop", {
   platform: process.platform,
   version: process.env.npm_package_version ?? "",
+  signInWithBrowser: () => ipcRenderer.invoke("auth:sign-in-with-browser"),
   openSpace: (options: { appId: string; version: number; bounds: Bounds }) => ipcRenderer.invoke("space:open", options),
   setSpaceBounds: (bounds: Bounds) => ipcRenderer.send("space:bounds", bounds),
   reloadSpace: () => ipcRenderer.send("space:reload"),

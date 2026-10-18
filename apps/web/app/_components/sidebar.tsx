@@ -163,9 +163,17 @@ export function Sidebar() {
       </nav>
 
       <div className="flex items-center gap-2 p-3 [-webkit-app-region:no-drag]">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-background font-medium text-xs">
+        <Link
+          aria-label="Settings"
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-full border bg-background font-medium text-xs transition-colors hover:bg-accent",
+            pathname === "/settings" && "bg-accent",
+          )}
+          href="/settings"
+          title="Settings"
+        >
           {initials}
-        </span>
+        </Link>
         <Link
           className={cn(
             "flex h-9 flex-1 items-center justify-center gap-2 rounded-full border bg-background font-medium shadow-xs transition-colors hover:bg-accent",

@@ -60,15 +60,6 @@ export function ThreadPanel({
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
       <div className="relative flex h-dvh flex-col" style={{ width: PANEL_WIDTH }}>
-        <button
-          aria-label="Close panel"
-          className={cn(roundButton, "absolute top-2.5 right-3 z-10 [-webkit-app-region:no-drag]")}
-          onClick={onClose}
-          type="button"
-        >
-          <XIcon className="size-4" />
-        </button>
-
         {/* Room on both sides for the close button, so the avatar and name stay centered. */}
         <div className="flex shrink-0 flex-col items-center px-14 pt-3 text-center">
           <span
@@ -84,6 +75,16 @@ export function ThreadPanel({
             {app ? `Version ${app.currentVersion}` : name === bot.name ? bot.tagline : bot.name}
           </span>
         </div>
+
+        {/* After the header, which inherits the panel's drag region: Electron resolves regions in DOM order. */}
+        <button
+          aria-label="Close panel"
+          className={cn(roundButton, "absolute top-2.5 right-3 z-10 [-webkit-app-region:no-drag]")}
+          onClick={onClose}
+          type="button"
+        >
+          <XIcon className="size-4" />
+        </button>
 
         <div className="flex shrink-0 justify-center gap-1 px-3 pt-3 pb-3 [-webkit-app-region:no-drag]" role="tablist">
           {tabs.map((t) => (

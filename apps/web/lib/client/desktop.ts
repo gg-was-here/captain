@@ -21,6 +21,8 @@ export interface SpaceBounds {
 export interface CaptainDesktop {
   readonly platform: string;
   readonly version: string;
+  /** Open sign-in in the default browser (where passkeys work); the session comes back to this window. */
+  signInWithBrowser(): Promise<void>;
   /** Download the app version onto the Mac if needed, then show it in the Space view. */
   openSpace(options: { appId: string; version: number; bounds: SpaceBounds }): Promise<void>;
   setSpaceBounds(bounds: SpaceBounds): void;

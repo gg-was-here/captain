@@ -1,7 +1,7 @@
 "use client";
 
 import type { UserContent } from "ai";
-import { useEveAgent } from "eve/react";
+import { type EveMessage, useEveAgent } from "eve/react";
 import { AlertCircleIcon, SquareIcon } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
@@ -196,6 +196,11 @@ export function AgentChat({
   const showPendingThinking =
     isBusy &&
     (agent.status === "submitted" || lastMessage?.role !== "assistant" || isPendingAssistantShell);
+  // Tool calls are hidden, so the loader stays up until reply text streams or the bot waits on the user.
+  const awaitingUser = Object.values(agent.data.inputs).some((input) => input.status === "open");
+  const activity =
+    lastMessage?.role === "assistant" && !showPendingThinking ? activityOf(lastMessage) : "Thinking";
+  const showLoader = isBusy && !awaitingUser && activity !== undefined;
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
@@ -291,11 +296,12 @@ export function AgentChat({
 
   return (
     <main className="relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
-      {panelToggle ? (
-        <div className="absolute top-2.5 right-3 z-30 [-webkit-app-region:no-drag]">{panelToggle}</div>
-      ) : null}
       {showConversationLayout ? (
         <ChatHeader bot={bot} title={title} />
+      ) : null}
+      {/* After the header: Electron resolves drag regions in DOM order, so a later drag region would swallow clicks. */}
+      {panelToggle ? (
+        <div className="absolute top-2.5 right-3 z-30 [-webkit-app-region:no-drag]">{panelToggle}</div>
       ) : null}
 
       {showConversationLayout ? (
@@ -330,7 +336,7 @@ export function AgentChat({
                 />
               ),
             )}
-            {showPendingThinking ? <PendingThinking icon={bot.icon} /> : null}
+            {showLoader ? <PendingThinking icon={bot.icon} label={activity} /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
           <ConversationScrollButton />
@@ -444,14 +450,30 @@ function ChatHeader({ bot, title }: { readonly bot: ChatBot; readonly title?: st
   );
 }
 
-/** Shown while a reply is on its way: the bot's avatar and a soft "Working on it". */
-function PendingThinking({ icon }: { readonly icon: string }) {
+type Activity = "Thinking" | "Reading" | "Communicating" | "Working";
+
+/** What the bot is doing now, from its latest message part; undefined once reply text is streaming. */
+function activityOf(message: EveMessage): Activity | undefined {
+  const part = message.parts.findLast((p) => p.type !== "step-start");
+  if (part?.type === "text") return part.text.trim() ? undefined : "Thinking";
+  if (part?.type !== "dynamic-tool") return "Thinking";
+  // A finished tool hands control back to the model.
+  if (part.state === "output-available" || part.state === "output-error") return "Thinking";
+  const name = part.toolName.split("__").pop()?.toLowerCase() ?? "";
+  // Handing off to Builder, or sending something out on the user's behalf.
+  if (/^builder$|post|send|draft/.test(name)) return "Communicating";
+  if (/search|read|fetch|history|thread|list|get|query|retrieve|details/.test(name)) return "Reading";
+  return "Working";
+}
+
+/** Shown while a reply is on its way: the bot's avatar and what it is doing right now. */
+function PendingThinking({ icon, label }: { readonly icon: string; readonly label: Activity }) {
   return (
     <Message aria-live="polite" from="assistant">
       <MessageContent>
         <div className="flex items-center gap-2 text-sm">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{icon}</span>
-          <Shimmer duration={1.5}>Working on it</Shimmer>
+          <Shimmer duration={1.5}>{`${label}…`}</Shimmer>
         </div>
       </MessageContent>
     </Message>

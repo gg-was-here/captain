@@ -1,9 +1,11 @@
 import { generateText, Output } from "ai";
+import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
 import { requireUser, route } from "@/lib/server/user";
 
-const RUNTIME_MODEL = process.env.CAPTAIN_APP_MODEL ?? "nvidia/nemotron-3.5-lightning-free";
+// Direct Anthropic call via ANTHROPIC_API_KEY; anthropic() rejects non-Anthropic model IDs.
+const RUNTIME_MODEL = anthropic(process.env.CAPTAIN_APP_MODEL ?? "claude-haiku-5-5");
 
 const body = z.object({
   appId: z.string(),

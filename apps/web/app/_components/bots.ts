@@ -13,9 +13,6 @@ const SUGGESTIONS: Record<string, string[]> = {
     "Make a dashboard of emails waiting on my reply",
     "Create a habit tracker",
   ],
-  slack: ["What did I miss today?", "Summarize #general this week", "Find messages that mention me and need a reply"],
-  gmail: ["Triage my unread email", "Draft replies to anything urgent", "Find my recent receipts"],
-  notion: ["Find my latest meeting notes", "Create a project brief page", "What's in my task database?"],
 };
 
 export function chatBot(agent: string, app?: Pick<App, "name" | "icon" | "description"> | null): ChatBot {

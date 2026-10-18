@@ -160,7 +160,7 @@ export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
     <div>
       <CodeBlock
         className={compactCodeBlockClassName}
-        code={JSON.stringify(input, null, 2)}
+        code={JSON.stringify(input, null, 2) ?? ""}
         language="json"
       />
     </div>

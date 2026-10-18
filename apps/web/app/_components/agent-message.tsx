@@ -18,14 +18,6 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import {
-  BashToolContent,
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
 import {
   Questionnaire,
@@ -74,7 +66,7 @@ export function AgentMessage({
     >
       <MessageContent>
         {message.parts.map((part, index) =>
-          // Model reasoning is never shown; the chat shows only a pending indicator while it runs.
+          // Model reasoning is never shown; the chat's status loader covers it while it runs.
           part.type === "reasoning" ? null : (
             <AgentMessagePart
               canRespond={canRespond}
@@ -148,30 +140,9 @@ function AgentMessagePart({
         );
       }
 
+      // Tool calls themselves are never shown; the chat's status loader says what the bot is doing.
       return (
         <>
-          <Tool>
-            <ToolHeader
-              state={part.state}
-              title={part.toolMetadata?.eve?.label ?? part.toolName}
-              toolName={part.toolName}
-              type="dynamic-tool"
-            />
-            <ToolContent>
-              {part.toolName === "bash" ? (
-                <BashToolContent
-                  errorText={part.errorText}
-                  input={part.input}
-                  output={part.output}
-                />
-              ) : (
-                <>
-                  <ToolInput input={part.input} />
-                  <ToolOutput errorText={part.errorText} output={part.output} />
-                </>
-              )}
-            </ToolContent>
-          </Tool>
           <CaptainToolResult part={part} />
           {/* Kept outside the collapsed card so a pending approval is always visible. */}
           <InputRequestActions

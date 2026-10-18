@@ -13,6 +13,8 @@
     "./eve": "./src/eve.ts",
     "./auth": "./src/auth.ts",
     "./tools/*": "./src/tools/*.ts",
+    "./connections/*": "./src/connections/*.ts",
+    "./instructions/*": "./src/instructions/*.ts",
     "./channel": "./src/channel.ts",
     "./peers": "./src/peers.ts"
   },

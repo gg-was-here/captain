@@ -27,7 +27,7 @@ export const CONNECTORS = {
   },
   notion: {
     label: "Notion",
-    uid: process.env.CONNECT_NOTION ?? "notion",
+    uid: process.env.CONNECT_NOTION ?? "notion/notion",
     scopes: [],
   },
 } as const;

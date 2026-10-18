@@ -49,6 +49,8 @@ const extracted = await askJson<{ tasks: { title: string; due?: string }[] }>(
 
 Never use `fetch` to call third-party APIs, `localStorage`, or API keys. Everything goes through the SDK.
 
+Apps can only reach Slack and Gmail at runtime. You can read the user's Notion while building, but an app cannot call Notion, so don't build features that depend on it.
+
 # Design bar
 
 - It should look like a polished native Mac utility: generous spacing, system font, subtle borders, rounded corners, and good empty and loading states. Support light and dark mode with `dark:` variants.

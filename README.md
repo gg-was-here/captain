@@ -10,11 +10,10 @@ Captain.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js,
 
 | Path | What it is |
 | --- | --- |
-| `agents/captain` | Default bot. Searches the web and delegates to the other bots. |
-| `agents/slack`, `agents/gmail`, `agents/notion` | One bot per connector. Tokens are per user, through Vercel Connect. |
+| `agents/captain` | Default bot. Searches the web, works in Slack, Gmail and Notion, and delegates app building to Builder. |
 | `agents/builder` | Builds apps in a Vercel Sandbox (`create_app` → code → `package_app`). |
 | `agents/app-bot` | The bot for each built app. Reads the app's on-device data and proposes changes to it. |
-| `packages/core` | Shared DB schema, auth, connector clients and bot tools. |
+| `packages/core` | Shared DB schema, auth and connector clients, plus the Slack/Gmail tools, Notion connection and connection instructions that every bot re-exports. Connector tokens are per user, through Vercel Connect. |
 | `packages/app-template` | Starter every app is built from, including the `captain` SDK (`src/captain.ts`). Run `npm run sync-template` after editing it. |
 | `apps/web` | Threads, sidebar, Space panel, settings, and the runtime APIs that built apps call. |
 | `apps/desktop` | Electron shell. Downloads app bundles into `~/Library/Application Support/Captain/apps`, keeps each app's data in SQLite, and enforces per-app connector permissions. |
@@ -41,13 +40,13 @@ npm run desktop    # Captain.app pointed at localhost (in another terminal)
 Without Clerk keys, local dev runs as a single `local-user`, and data goes to `.data/captain.db`.
 
 ### One-time setup (needed for models, connectors and Builder)
-1. **Vercel:** run `npm i -g vercel && vercel login && vercel link`, then `vercel env pull .env.local`. This provides the AI Gateway and OIDC credentials that models, Vercel Connect and Vercel Sandbox need. `npm run dev` loads `.env.local` automatically.
+1. **Vercel:** run `npm i -g vercel && vercel login && vercel link`, then `vercel env pull .env.local`. This provides the `ANTHROPIC_API_KEY` the bots' models use and the OIDC credentials that Vercel Connect and Vercel Sandbox need. `npm run dev` loads `.env.local` automatically.
 2. **Connectors** (from the repo root):
    - `vercel connect create slack --name captain`
    - `vercel connect create https://mcp.notion.com/mcp`
    - Register a Google OAuth client (Gmail scopes) with `vercel connect create`.
 
-   If the generated IDs differ from `slack/captain`, `google/captain` and `notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`. Then finish setting up the Notion bot: `cd agents/notion && npx eve add connection/notion --non-interactive`.
+   If the generated IDs differ from `slack/captain`, `google/captain` and `notion/notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`.
 3. **Production services** (Vercel Marketplace):
    - Turso: `DATABASE_URL`, `TURSO_AUTH_TOKEN`
    - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`

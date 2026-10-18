@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { app, BrowserWindow, ipcMain, Menu, shell } from "electron";
 import { autoUpdater } from "electron-updater";
+import { signInWithBrowser } from "./auth";
 import { registerAppScheme, SpaceManager } from "./space";
 import * as store from "./store";
 
@@ -71,6 +72,10 @@ function fromCaptain(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent)
   if (event.sender !== mainWindow?.webContents || !isCaptainUrl(url)) throw new Error("Forbidden");
 }
 
+ipcMain.handle("auth:sign-in-with-browser", (event) => {
+  fromCaptain(event);
+  if (mainWindow) return signInWithBrowser(mainWindow, ORIGIN);
+});
 ipcMain.handle("space:open", (event, { appId, version, bounds }) => {
   fromCaptain(event);
   return space?.open(appId, version, bounds);
