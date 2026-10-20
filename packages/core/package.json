@@ -16,7 +16,8 @@
     "./connections/*": "./src/connections/*.ts",
     "./instructions/*": "./src/instructions/*.ts",
     "./channel": "./src/channel.ts",
-    "./peers": "./src/peers.ts"
+    "./peers": "./src/peers.ts",
+    "./usage": "./src/usage.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.25.0",

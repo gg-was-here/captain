@@ -1,5 +1,6 @@
 import "server-only";
 import { type CaptainUser, resolveUser } from "@captain/core/auth";
+import { UsageLimitError } from "@captain/core/usage";
 import { headers } from "next/headers";
 
 export async function currentUser(request?: Request): Promise<CaptainUser | null> {
@@ -22,13 +23,14 @@ export async function requireUser(request?: Request): Promise<CaptainUser> {
   return user;
 }
 
-/** Wrap a route handler so `HttpError`s become JSON responses. */
+/** Wrap a route handler so `HttpError`s and usage limits become JSON responses. */
 export function route<A extends unknown[]>(handler: (...args: A) => Promise<Response>) {
   return async (...args: A) => {
     try {
       return await handler(...args);
     } catch (error) {
       if (error instanceof HttpError) return Response.json({ error: error.message }, { status: error.status });
+      if (error instanceof UsageLimitError) return Response.json({ error: error.message }, { status: 429 });
       console.error(error);
       return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }

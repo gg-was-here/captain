@@ -48,9 +48,13 @@ Without Clerk keys, local dev runs as a single `local-user`, and data goes to `.
 
    If the generated IDs differ from `slack/captain`, `google/captain` and `notion/notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`.
 3. **Production services** (Vercel Marketplace):
-   - Turso: `DATABASE_URL`, `TURSO_AUTH_TOKEN`
+   - Turso: `TURSO_DATABASE_URL` (or `DATABASE_URL`), `TURSO_AUTH_TOKEN`
    - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
    - Vercel Blob: `BLOB_READ_WRITE_TOKEN`
+   - Optional: `CAPTAIN_SIGNING_SECRET` signs web-preview URLs for built apps (defaults to `CLERK_SECRET_KEY`).
+   - Optional per-user daily limits: `CAPTAIN_DAILY_MESSAGES_LIMIT` (default 200 messages to bots), `CAPTAIN_DAILY_AI_LIMIT` (500 AI calls from apps), `CAPTAIN_DAILY_BUILDS_LIMIT` (20 new apps).
+
+   `vercel env pull` also points local dev at the production Turso database. To keep local data separate, run with `DATABASE_URL=file:$PWD/.data/captain.db`.
 4. **Deploy:** run `vercel deploy`. `withEve` deploys the web app and every bot as one project.
 
 ### Ship the Mac app

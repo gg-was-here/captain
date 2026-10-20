@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
@@ -64,6 +64,19 @@ export const appVersions = sqliteTable("app_versions", {
   notes: text("notes").notNull().default(""),
   createdAt: timestamps.createdAt,
 });
+
+/** Per-user daily usage counters, for the limits in `usage.ts`. */
+export const usage = sqliteTable(
+  "usage",
+  {
+    userId: text("user_id").notNull(),
+    /** UTC date, `YYYY-MM-DD`. */
+    day: text("day").notNull(),
+    kind: text("kind").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day, t.kind] })],
+);
 
 export type Thread = typeof threads.$inferSelect;
 export type App = typeof apps.$inferSelect;

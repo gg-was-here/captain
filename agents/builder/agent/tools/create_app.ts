@@ -1,4 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
+import { consumeUsage } from "@captain/core/usage";
 import { defineTool } from "eve/tools";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -22,6 +23,7 @@ export default defineTool({
   async execute(input, ctx) {
     const userId = ctx.session.auth.current?.principalId;
     if (!userId) throw new Error("Sign in to Captain to build apps.");
+    await consumeUsage(userId, "builds");
     const appId = `app_${nanoid(10)}`;
     const db = await getDb();
     await db.insert(schema.apps).values({ id: appId, userId, threadId: ctx.session.id, ...input });

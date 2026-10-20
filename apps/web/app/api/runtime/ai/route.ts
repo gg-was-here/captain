@@ -1,3 +1,4 @@
+import { consumeUsage } from "@captain/core/usage";
 import { generateText, Output } from "ai";
 import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
@@ -19,6 +20,7 @@ export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
   const input = body.parse(await request.json());
   const app = await requireApp(user.id, input.appId);
+  await consumeUsage(user.id, "ai");
   const system = [
     `You are the AI engine inside "${app.name}", a small app the user built: ${app.description}`,
     input.system,
