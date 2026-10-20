@@ -30,7 +30,7 @@ export function route<A extends unknown[]>(handler: (...args: A) => Promise<Resp
     } catch (error) {
       if (error instanceof HttpError) return Response.json({ error: error.message }, { status: error.status });
       console.error(error);
-      return Response.json({ error: error instanceof Error ? error.message : "Internal error" }, { status: 500 });
+      return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }
   };
 }

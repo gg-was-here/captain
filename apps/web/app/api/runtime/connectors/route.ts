@@ -15,7 +15,9 @@ const body = z.object({
  * `captain.connectors.call()` for apps the user built. The app may only use
  * connectors it declared, and write actions need explicit user confirmation:
  * the first call returns 409 with a summary; the client asks the user and
- * retries with `x-captain-confirmed: 1`.
+ * retries with `x-captain-confirmed: 1`. Apps never call this directly — only
+ * trusted Captain code does (the desktop main process, or the web page via
+ * `lib/client/app-bridge.ts`), since the app itself has no Captain session.
  */
 export const POST = route(async (request: Request) => {
   const user = await requireUser(request);

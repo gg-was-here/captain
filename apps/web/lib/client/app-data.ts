@@ -20,24 +20,51 @@ export async function readAppData(appId: string): Promise<Record<string, AppReco
   return data;
 }
 
+const DATA_CHANGED = "captain:app-data-changed";
+
+/** Fires when a browser-stored app collection changes outside the app (e.g. the app bot edited it). */
+export function onAppDataChanged(listener: (appId: string, collection: string) => void) {
+  const handler = (event: Event) => {
+    const { appId, collection } = (event as CustomEvent<{ appId: string; collection: string }>).detail;
+    listener(appId, collection);
+  };
+  window.addEventListener(DATA_CHANGED, handler);
+  return () => window.removeEventListener(DATA_CHANGED, handler);
+}
+
+// Browser storage, shared by the web preview's `window.captain` bridge and the app bot.
+const readCollection = (appId: string, collection: string): AppRecord[] =>
+  JSON.parse(localStorage.getItem(prefix(appId) + collection) ?? "[]");
+const writeCollection = (appId: string, collection: string, records: AppRecord[]) =>
+  localStorage.setItem(prefix(appId) + collection, JSON.stringify(records));
+
+export function listWebRecords(appId: string, collection: string) {
+  return readCollection(appId, collection);
+}
+
+export function putWebRecord(appId: string, collection: string, record: Record<string, unknown>): AppRecord {
+  const records = readCollection(appId, collection);
+  const now = new Date().toISOString();
+  const id = typeof record.id === "string" ? record.id : crypto.randomUUID();
+  const existing = records.find((r) => r.id === id);
+  const next = { ...existing, ...record, id, createdAt: existing?.createdAt ?? now, updatedAt: now } as AppRecord;
+  writeCollection(appId, collection, existing ? records.map((r) => (r.id === id ? next : r)) : [...records, next]);
+  return next;
+}
+
+export function removeWebRecord(appId: string, collection: string, id: string) {
+  writeCollection(appId, collection, readCollection(appId, collection).filter((r) => r.id !== id));
+}
+
 export async function applyAppChanges(appId: string, changes: AppDataChange[]) {
   const desktop = getDesktop();
   if (desktop) return desktop.applyAppChanges(appId, changes);
-  const now = new Date().toISOString();
   for (const change of changes) {
-    const key = prefix(appId) + change.collection;
-    const records: AppRecord[] = JSON.parse(localStorage.getItem(key) ?? "[]");
-    if (change.op === "remove") {
-      localStorage.setItem(key, JSON.stringify(records.filter((r) => r.id !== change.id)));
-      continue;
-    }
-    const id = typeof change.record.id === "string" ? change.record.id : crypto.randomUUID();
-    const existing = records.find((r) => r.id === id);
-    const next = { ...existing, ...change.record, id, createdAt: existing?.createdAt ?? now, updatedAt: now };
-    localStorage.setItem(
-      key,
-      JSON.stringify(existing ? records.map((r) => (r.id === id ? next : r)) : [...records, next]),
-    );
+    if (change.op === "remove") removeWebRecord(appId, change.collection, change.id);
+    else putWebRecord(appId, change.collection, change.record);
+  }
+  for (const collection of new Set(changes.map((c) => c.collection))) {
+    window.dispatchEvent(new CustomEvent(DATA_CHANGED, { detail: { appId, collection } }));
   }
 }
 

@@ -1,3 +1,4 @@
+import { deleteBundles } from "@captain/core/bundles";
 import { getDb, schema } from "@captain/core/db";
 import { and, eq } from "drizzle-orm";
 import { findBuildThread, requireApp } from "@/lib/server/data";
@@ -14,9 +15,13 @@ export const GET = route(async (request: Request, { params }: Params) => {
 
 export const DELETE = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
-  const { id } = await params;
+  const app = await requireApp(user.id, (await params).id);
   const db = await getDb();
-  await db.delete(schema.apps).where(and(eq(schema.apps.id, id), eq(schema.apps.userId, user.id)));
-  await db.delete(schema.appVersions).where(eq(schema.appVersions.appId, id));
+  const versions = await db
+    .delete(schema.appVersions)
+    .where(eq(schema.appVersions.appId, app.id))
+    .returning({ bundleKey: schema.appVersions.bundleKey });
+  await db.delete(schema.apps).where(and(eq(schema.apps.id, app.id), eq(schema.apps.userId, user.id)));
+  await deleteBundles(versions.map((v) => v.bundleKey));
   return new Response(null, { status: 204 });
 });

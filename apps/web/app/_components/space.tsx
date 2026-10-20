@@ -2,6 +2,7 @@
 
 import type { App } from "@captain/core/schema";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { serveAppBridge } from "@/lib/client/app-bridge";
 import { getDesktop } from "@/lib/client/desktop";
 
 export type SpaceApp = Pick<App, "id" | "name" | "icon" | "description" | "currentVersion">;
@@ -19,6 +20,7 @@ export const useSpace = () => useContext(SpaceContext);
 export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; readonly reloadKey?: number }) {
   const desktop = getDesktop();
   const hostRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string>();
 
@@ -52,6 +54,11 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
     if (desktop && reloadKey > 0) desktop.reloadSpace();
   }, [desktop, reloadKey]);
 
+  useEffect(() => {
+    if (desktop || !frameRef.current) return;
+    return serveAppBridge(frameRef.current, app);
+  }, [desktop, app.id, app.name, app.currentVersion, reloadKey]);
+
   return (
     <div className="relative size-full" ref={hostRef}>
       {desktop ? (
@@ -62,7 +69,8 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
         <iframe
           className="absolute inset-0 size-full bg-white"
           key={reloadKey}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+          ref={frameRef}
+          sandbox="allow-scripts allow-forms allow-modals allow-popups"
           src={`/a/${app.id}/?v=${app.currentVersion}`}
           title={app.name}
         />

@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { localDataDir } from "./db-url";
 
 /**
@@ -42,6 +42,15 @@ export async function saveBundle(bundle: AppBundle): Promise<string> {
     await writeFile(path, body);
   }
   return key;
+}
+
+export async function deleteBundles(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  if (useBlob()) {
+    await del(keys);
+  } else {
+    await Promise.all(keys.map((key) => rm(join(localDataDir(), "bundles", key), { force: true })));
+  }
 }
 
 export async function loadBundle(key: string): Promise<AppBundle | null> {
