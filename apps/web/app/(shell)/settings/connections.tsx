@@ -9,7 +9,7 @@ type Connection = { name: string; label: string; status: "connected" | "disconne
 
 const DESCRIPTIONS: Record<string, string> = {
   slack: "Lets the Slack bot and your apps search, read and (with approval) post messages as you.",
-  google: "Lets the Gmail bot and your apps search, read and draft email. Calendar, Drive and Docs come next.",
+  google: "Lets the Gmail bot and your apps search, read and draft email.",
   notion: "Lets the Notion bot find, read and edit your pages and databases.",
 };
 
@@ -17,36 +17,71 @@ export function Connections() {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
-  const load = useCallback(async () => {
-    const response = await fetch("/api/connections");
-    const body = await response.json();
-    if (!response.ok) setError(body.error);
-    else setConnections(body.connections);
+  const load = useCallback(async (): Promise<Connection[] | null> => {
+    try {
+      const response = await fetch("/api/connections");
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      setConnections(body.connections);
+      return body.connections;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't load your connections.");
+      setConnections([]);
+      return null;
+    }
   }, []);
 
   useEffect(() => {
-    void load();
+    // Returning from a provider's consent screen lands on /settings?connected=<name>.
+    const returned = new URLSearchParams(window.location.search).get("connected");
+    if (returned) window.history.replaceState(window.history.state, "", window.location.pathname);
+    void load().then((list) => {
+      const connection = list?.find((c) => c.name === returned);
+      if (!connection) return;
+      if (connection.status === "connected") setNotice(`${connection.label} is connected.`);
+      else setError(`${connection.label} wasn't connected. Try again.`);
+    });
+    // In the Mac app, sign-in finishes in the browser; refresh when the user comes back.
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [load]);
 
   const connect = async (name: string) => {
     setBusy(name);
     setError(undefined);
+    setNotice(undefined);
     try {
-      const response = await fetch(`/api/connections/${name}`, { method: "POST" });
+      const desktop = getDesktop();
+      const response = await fetch(`/api/connections/${name}${desktop ? "?desktop=1" : ""}`, { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
-      // In the Mac app, provider sign-in happens in the default browser (Google blocks embedded sign-in).
-      window.location.assign(body.url);
+      if (desktop) {
+        // The Mac app opens new windows in the default browser (Google blocks embedded sign-in).
+        window.open(body.url, "_blank");
+        setBusy(undefined);
+      } else {
+        window.location.assign(body.url);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(undefined);
     }
   };
 
-  const disconnect = async (name: string) => {
-    setBusy(name);
-    await fetch(`/api/connections/${name}`, { method: "DELETE" });
+  const disconnect = async (connection: Connection) => {
+    if (!window.confirm(`Disconnect ${connection.label}? Its bot and your apps will lose access until you reconnect.`)) return;
+    setBusy(connection.name);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      const response = await fetch(`/api/connections/${connection.name}`, { method: "DELETE" });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't disconnect.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
     setBusy(undefined);
     void load();
   };
@@ -59,6 +94,7 @@ export function Connections() {
           Each connection is authorized as you and shared by its bot, by Captain, and by the apps you allow.
         </p>
         {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
+        {notice ? <p className="mt-3 text-sm">{notice}</p> : null}
         <ul className="mt-4 divide-y rounded-xl border bg-card">
           {(connections ?? []).map((c) => (
             <li className="flex items-center gap-4 p-4" key={c.name}>
@@ -68,10 +104,14 @@ export function Connections() {
                   {c.status === "connected" ? <Badge variant="secondary">Connected</Badge> : null}
                   {c.status === "unavailable" ? <Badge variant="outline">Not configured</Badge> : null}
                 </div>
-                <p className="mt-0.5 text-muted-foreground text-sm">{DESCRIPTIONS[c.name]}</p>
+                <p className="mt-0.5 text-muted-foreground text-sm">
+                  {c.status === "unavailable"
+                    ? `${c.label} isn't set up on this Captain server yet. Ask your Captain admin to add it.`
+                    : DESCRIPTIONS[c.name]}
+                </p>
               </div>
               {c.status === "connected" ? (
-                <Button disabled={busy === c.name} onClick={() => void disconnect(c.name)} size="sm" variant="outline">
+                <Button disabled={busy === c.name} onClick={() => void disconnect(c)} size="sm" variant="outline">
                   Disconnect
                 </Button>
               ) : (

@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
   );
   // Without Clerk keys (local dev) Captain runs as a single local user.
   return process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-    <ClerkProvider signInUrl="/sign-in">{page}</ClerkProvider>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">{page}</ClerkProvider>
   ) : (
     page
   );

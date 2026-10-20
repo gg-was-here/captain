@@ -10,11 +10,19 @@ async function connectorName(params: Params["params"]): Promise<ConnectorName> {
   return name as ConnectorName;
 }
 
-/** Start OAuth: returns the provider consent URL. The user lands back on /settings when done. */
+/**
+ * Start OAuth: returns the provider consent URL. The user lands back on
+ * /settings when done, or, from the Mac app (`?desktop=1`, where consent runs
+ * in the browser), on a page that sends them back to the app.
+ */
 export const POST = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
   const name = await connectorName(params);
-  const callbackUrl = new URL("/settings?connected=" + name, request.url).toString();
+  const fromDesktop = new URL(request.url).searchParams.get("desktop") === "1";
+  const callbackUrl = new URL(
+    fromDesktop ? `/desktop/connected?name=${name}` : `/settings?connected=${name}`,
+    request.url,
+  ).toString();
   return Response.json({ url: await authorizationUrl(user, name, callbackUrl) });
 });
 

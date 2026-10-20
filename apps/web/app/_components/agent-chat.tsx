@@ -25,6 +25,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { refreshSidebar } from "@/lib/client/events";
 import { AgentMessage } from "./agent-message";
 import { AttachButton, AttachmentChips, MicButton } from "./composer-buttons";
+import { ConnectPrompt } from "./connect-prompt";
 import { NewThreadMenu } from "./new-thread-dialog";
 
 export interface ChatBot {
@@ -361,6 +362,7 @@ export function AgentChat({
               className="mt-5 flex size-12 items-center justify-center rounded-full border bg-background text-foreground/80 shadow-xs transition-colors hover:bg-accent hover:text-foreground"
               iconClassName="size-5"
             />
+            <ConnectPrompt />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">

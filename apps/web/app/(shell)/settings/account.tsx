@@ -1,12 +1,32 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /** Shown only when Clerk is configured. "_blank" opens in the default browser from the Mac app. */
 export function Account() {
   const { user } = useUser();
   const { signOut } = useClerk();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string>();
+
+  const deleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Delete your Captain account? This removes your threads, apps and connections and can't be undone. Apps already downloaded to a Mac keep their local data until you delete them in Finder.",
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setError(undefined);
+    const response = await fetch("/api/me", { method: "DELETE" });
+    if (!response.ok) {
+      setError((await response.json().catch(() => ({}))).error ?? "Couldn't delete your account.");
+      setDeleting(false);
+      return;
+    }
+    await signOut({ redirectUrl: "/sign-in" });
+  };
+
   return (
     <section className="mt-8">
       <h2 className="font-medium text-lg">Account</h2>
@@ -22,6 +42,16 @@ export function Account() {
         </Button>
         <Button onClick={() => void signOut({ redirectUrl: "/sign-in" })} size="sm" variant="ghost">
           Sign out
+        </Button>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">Delete account</div>
+          <p className="mt-0.5 text-muted-foreground text-sm">Permanently remove your account and everything Captain stores for you.</p>
+          {error ? <p className="mt-1 text-destructive text-sm">{error}</p> : null}
+        </div>
+        <Button disabled={deleting} onClick={() => void deleteAccount()} size="sm" variant="destructive">
+          {deleting ? "Deleting…" : "Delete account"}
         </Button>
       </div>
     </section>
