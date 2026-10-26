@@ -61,7 +61,8 @@ export function Sidebar() {
   }, [searching]);
 
   const appById = new Map(apps.map((app) => [app.id, app]));
-  // Apps arrive most recently updated first, so a Builder thread maps to the latest app it built.
+  // Apps arrive most recently updated first, so a Builder thread maps to the latest app it
+  // built. An app's threadId is the session id of the thread that built it.
   const appByBuildThread = new Map<string, App>();
   for (const app of apps) if (app.threadId && !appByBuildThread.has(app.threadId)) appByBuildThread.set(app.threadId, app);
   const needle = query.trim().toLowerCase();
@@ -124,7 +125,7 @@ export function Sidebar() {
         ) : (
           visible.map((thread) => {
             const app = thread.appId ? appById.get(thread.appId) : undefined;
-            const tagline = (app ?? appByBuildThread.get(thread.id))?.tagline;
+            const tagline = (app ?? (thread.sessionId ? appByBuildThread.get(thread.sessionId) : undefined))?.tagline;
             const icon =
               thread.agent === "app-bot" ? (app?.icon ?? "✨") : (botByAgent.get(thread.agent)?.icon ?? "💬");
             const active = pathname === `/t/${thread.id}`;
