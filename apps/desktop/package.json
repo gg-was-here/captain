@@ -19,5 +19,5 @@
   "dependencies": {
     "electron-updater": "^6.6.2"
   },
-  "captainUrl": "https://captain.app"
+  "captainUrl": "https://bambii.ai"
 }
