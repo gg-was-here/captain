@@ -22,6 +22,9 @@ export function registerAppScheme() {
   ]);
 }
 
+/** Matches the `rounded-2xl` card the Space sits in (apps/web/app/_components/thread-panel.tsx). */
+const CORNER_RADIUS = 16;
+
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
@@ -131,6 +134,7 @@ export class SpaceManager {
     });
     this.window.contentView.addChildView(view);
     view.setBounds(bounds);
+    view.setBorderRadius(CORNER_RADIUS);
     this.view = view;
     this.appId = appId;
     try {
