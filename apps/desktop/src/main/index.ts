@@ -67,9 +67,19 @@ function createWindow() {
 }
 
 /** Only the Captain web UI (not third-party pages during OAuth) may use the desktop bridge. */
-function fromCaptain(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
+function isFromCaptain(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
   const url = event.senderFrame?.url ?? "";
-  if (event.sender !== mainWindow?.webContents || !isCaptainUrl(url)) throw new Error("Forbidden");
+  return event.sender === mainWindow?.webContents && isCaptainUrl(url);
+}
+
+/**
+ * For `handle` channels, where the rejection reaches the caller. Fire-and-forget
+ * `on` channels use `isFromCaptain` and drop the message instead: a throw there is
+ * an uncaught main-process exception, and late messages from a frame that's
+ * navigating away (e.g. a resize during reload) arrive with no senderFrame.
+ */
+function fromCaptain(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
+  if (!isFromCaptain(event)) throw new Error("Forbidden");
 }
 
 ipcMain.handle("auth:sign-in-with-browser", (event) => {
@@ -81,15 +91,15 @@ ipcMain.handle("space:open", (event, { appId, version, bounds }) => {
   return space?.open(appId, version, bounds);
 });
 ipcMain.on("space:bounds", (event, bounds) => {
-  fromCaptain(event);
+  if (!isFromCaptain(event)) return;
   space?.setBounds(bounds);
 });
 ipcMain.on("space:reload", (event) => {
-  fromCaptain(event);
+  if (!isFromCaptain(event)) return;
   space?.reload();
 });
 ipcMain.on("space:close", (event) => {
-  fromCaptain(event);
+  if (!isFromCaptain(event)) return;
   space?.close();
 });
 ipcMain.handle("apps:read-data", (event, appId: string) => {
@@ -105,7 +115,7 @@ ipcMain.handle("apps:installed", (event) => {
   return store.installedApps();
 });
 ipcMain.on("apps:reveal", (event, appId: string) => {
-  fromCaptain(event);
+  if (!isFromCaptain(event)) return;
   shell.showItemInFolder(join(store.appDir(appId), "manifest.json"));
 });
 
