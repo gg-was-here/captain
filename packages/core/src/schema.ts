@@ -39,6 +39,8 @@ export const apps = sqliteTable(
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
+    /** About three words, shown under the app's thread in the sidebar. */
+    tagline: text("tagline").notNull().default(""),
     icon: text("icon").notNull().default("✨"),
     /** Thread where the app was built. */
     threadId: text("thread_id"),

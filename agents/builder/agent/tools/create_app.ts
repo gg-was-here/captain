@@ -11,6 +11,10 @@ export default defineTool({
   inputSchema: z.object({
     name: z.string().min(1).max(40),
     description: z.string().max(300),
+    tagline: z
+      .string()
+      .max(40)
+      .describe("Exactly three words saying what the app does, shown in the sidebar, e.g. 'Turkish flashcard trainer'"),
     icon: z.string().max(4).describe("A single emoji"),
     connectors: z
       .array(z.enum(["slack", "google"]))

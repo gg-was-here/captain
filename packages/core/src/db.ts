@@ -53,6 +53,7 @@ async function migrate(client: ReturnType<typeof createClient>) {
   for (const statement of [
     `ALTER TABLE threads ADD COLUMN preview TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE threads ADD COLUMN instructions TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE apps ADD COLUMN tagline TEXT NOT NULL DEFAULT ''`,
   ]) {
     await client.execute(statement).catch(() => {});
   }

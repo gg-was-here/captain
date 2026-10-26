@@ -61,6 +61,9 @@ export function Sidebar() {
   }, [searching]);
 
   const appById = new Map(apps.map((app) => [app.id, app]));
+  // Apps arrive most recently updated first, so a Builder thread maps to the latest app it built.
+  const appByBuildThread = new Map<string, App>();
+  for (const app of apps) if (app.threadId && !appByBuildThread.has(app.threadId)) appByBuildThread.set(app.threadId, app);
   const needle = query.trim().toLowerCase();
   const visible = needle
     ? threads.filter((t) => `${t.title} ${t.preview}`.toLowerCase().includes(needle))
@@ -121,6 +124,7 @@ export function Sidebar() {
         ) : (
           visible.map((thread) => {
             const app = thread.appId ? appById.get(thread.appId) : undefined;
+            const tagline = (app ?? appByBuildThread.get(thread.id))?.tagline;
             const icon =
               thread.agent === "app-bot" ? (app?.icon ?? "✨") : (botByAgent.get(thread.agent)?.icon ?? "💬");
             const active = pathname === `/t/${thread.id}`;
@@ -144,7 +148,7 @@ export function Sidebar() {
                   <span className="min-w-0 flex-1 pr-5">
                     <span className="block truncate font-medium">{thread.title}</span>
                     <span className="block truncate text-muted-foreground text-xs">
-                      {thread.preview ? clip(thread.preview, PREVIEW_CHARS) : "No messages yet"}
+                      {tagline || (thread.preview ? clip(thread.preview, PREVIEW_CHARS) : "No messages yet")}
                     </span>
                   </span>
                 </Link>

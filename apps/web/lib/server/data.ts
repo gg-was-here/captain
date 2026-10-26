@@ -1,6 +1,10 @@
 import "server-only";
 import { getDb, schema } from "@captain/core/db";
+import { DEFAULT_MODELS } from "@captain/core/models";
+import { generateText, Output } from "ai";
 import { and, desc, eq } from "drizzle-orm";
+import { anthropic } from "eve/models/anthropic";
+import { z } from "zod";
 import { HttpError } from "./user";
 
 export async function listThreads(userId: string) {
@@ -61,4 +65,31 @@ export async function findBuildThread(userId: string, sessionId: string | null) 
     .from(schema.threads)
     .where(and(eq(schema.threads.userId, userId), eq(schema.threads.sessionId, sessionId)));
   return thread ?? null;
+}
+
+/** Apps already sent to the model this process, so a failed or skipped fill isn't retried on every sidebar load. */
+const taglineAttempted = new Set<string>();
+
+/**
+ * Writes the sidebar taglines for apps built before Builder started supplying them, in one model
+ * call. Runs after the response, so those apps show their tagline from the next sidebar load.
+ */
+export async function fillMissingTaglines(apps: (typeof schema.apps.$inferSelect)[]) {
+  const missing = apps.filter((app) => !app.tagline && !taglineAttempted.has(app.id));
+  if (missing.length === 0) return;
+  for (const app of missing) taglineAttempted.add(app.id);
+  const { output } = await generateText({
+    model: anthropic(DEFAULT_MODELS.default),
+    output: Output.object({
+      schema: z.object({ taglines: z.array(z.object({ id: z.string(), tagline: z.string() })) }),
+    }),
+    prompt: `For each app, write exactly three words saying what it does, like "Turkish flashcard trainer". Keep each app's id.\n\n${JSON.stringify(
+      missing.map(({ id, name, description }) => ({ id, name, description })),
+    )}`,
+  });
+  const db = await getDb();
+  for (const { id, tagline } of output.taglines) {
+    if (!missing.some((app) => app.id === id)) continue;
+    await db.update(schema.apps).set({ tagline: tagline.slice(0, 40) }).where(eq(schema.apps.id, id));
+  }
 }
