@@ -8,7 +8,9 @@ export { schema };
 const globalForDb = globalThis as unknown as { __captainDb?: ReturnType<typeof createDb> };
 
 function createDb() {
-  const client = createClient({ url: databaseUrl(), authToken: process.env.TURSO_AUTH_TOKEN });
+  // `timeout` is the busy timeout for local files. Unlike `PRAGMA busy_timeout`, it applies to every
+  // connection in the client's pool, not just the one that ran the pragma.
+  const client = createClient({ url: databaseUrl(), authToken: process.env.TURSO_AUTH_TOKEN, timeout: 5000 });
   return { client, db: drizzle(client, { schema }), ready: migrate(client) };
 }
 
@@ -19,8 +21,7 @@ function createDb() {
 async function migrate(client: ReturnType<typeof createClient>) {
   if (databaseUrl().startsWith("file:")) {
     // Local dev: the web server and every bot server share this file. WAL lets readers and a writer
-    // overlap, and the busy timeout waits for another process's write instead of failing with SQLITE_BUSY.
-    await client.execute("PRAGMA busy_timeout = 5000");
+    // overlap; the client's `timeout` waits for another process's write instead of failing with SQLITE_BUSY.
     await client.execute("PRAGMA journal_mode = WAL");
   }
   await client.batch(
