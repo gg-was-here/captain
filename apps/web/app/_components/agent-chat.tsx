@@ -361,7 +361,8 @@ export function AgentChat({
               : `eve:web-chat-scroll:${activeSessionId}`
           }
         >
-          <ConversationTopFade className="top-14" />
+          {/* Covers the see-through header too, so messages fade out behind it instead of under a band below it. */}
+          <ConversationTopFade className="h-20 via-background via-60%" />
           <ConversationContent className="mx-auto w-full max-w-3xl gap-3 px-4 pt-20 pb-36 sm:px-6">
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
