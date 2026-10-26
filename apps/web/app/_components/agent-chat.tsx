@@ -248,7 +248,7 @@ export function AgentChat({
     lastMessage?.role === "assistant" && !showPendingThinking ? activityOf(lastMessage) : "Thinking";
   const showLoader = isBusy && !awaitingUser && activity !== undefined;
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
-  const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
+  const errorMessage = cancellationError ?? explainSendError(agent.error?.message, sessionId) ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
   // A saved thread always opens as a chat: its name on top, the composer at the bottom.
   const showConversationLayout = isResuming || hasConversationContent || initialThreadId !== undefined;
@@ -467,6 +467,17 @@ function ComposerAction({
       <SquareIcon className="size-3 fill-current" />
     </PromptInputButton>
   );
+}
+
+/**
+ * Local `eve dev` leaves conversations from before its last restart dormant, and sending to one fails
+ * with eve's generic send error. Production runs are durable, so this only explains it in development,
+ * for threads that existed before this page loaded.
+ */
+function explainSendError(message: string | undefined, savedSessionId: string | undefined) {
+  if (process.env.NODE_ENV !== "development" || savedSessionId === undefined) return message;
+  if (message !== "Failed to send the session message.") return message;
+  return "This chat can't continue: it started before the local dev server last restarted, and eve dev doesn't resume older chats. Start a new chat to keep going.";
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {

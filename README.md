@@ -42,6 +42,8 @@ npm run desktop    # Captain.app pointed at localhost (in another terminal)
 
 Without Clerk keys, local dev runs as a single `local-user`, and data goes to `.data/captain.db`.
 
+Chats started before you restart `npm run dev` can't take new messages in local dev (eve leaves them dormant), so start a new chat after a restart. Edits to bots and tools hot-reload without a restart. Deployed chats aren't affected.
+
 `vercel env pull` (below) adds Clerk, Turso and Blob keys, which turn on sign-in and point local dev at production data. To keep working as `local-user` with local data, create a gitignored `.env.development.local` that blanks them. `npm run dev` loads it before `.env.local`, so these values win:
 
 ```bash
