@@ -78,6 +78,16 @@ export const usage = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.day, t.kind] })],
 );
 
+/** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
+export const userSettings = sqliteTable("user_settings", {
+  userId: text("user_id").primaryKey(),
+  /** Model for chatting: Captain, app bots and AI calls from apps. */
+  defaultModel: text("default_model"),
+  /** Model for building apps (Builder). */
+  builderModel: text("builder_model"),
+  ...timestamps,
+});
+
 export type Thread = typeof threads.$inferSelect;
 export type App = typeof apps.$inferSelect;
 export type AppVersion = typeof appVersions.$inferSelect;

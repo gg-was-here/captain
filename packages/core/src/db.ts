@@ -37,6 +37,9 @@ async function migrate(client: ReturnType<typeof createClient>) {
       `CREATE TABLE IF NOT EXISTS usage (
         user_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, day, kind))`,
+      `CREATE TABLE IF NOT EXISTS user_settings (
+        user_id TEXT PRIMARY KEY, default_model TEXT, builder_model TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
     ],
     "write",
   );

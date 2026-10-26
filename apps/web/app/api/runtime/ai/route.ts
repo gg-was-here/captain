@@ -1,12 +1,10 @@
+import { getModelSettings } from "@captain/core/models";
 import { consumeUsage } from "@captain/core/usage";
 import { generateText, Output } from "ai";
 import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
 import { requireUser, route } from "@/lib/server/user";
-
-// Direct Anthropic call via ANTHROPIC_API_KEY; anthropic() rejects non-Anthropic model IDs.
-const RUNTIME_MODEL = anthropic(process.env.CAPTAIN_APP_MODEL ?? "claude-haiku-5-5");
 
 const body = z.object({
   appId: z.string(),
@@ -21,6 +19,9 @@ export const POST = route(async (request: Request) => {
   const input = body.parse(await request.json());
   const app = await requireApp(user.id, input.appId);
   await consumeUsage(user.id, "ai");
+  // The user's default model from Settings → Models (`CAPTAIN_APP_MODEL` overrides it for every user).
+  // Direct Anthropic call via ANTHROPIC_API_KEY; anthropic() rejects non-Anthropic model IDs.
+  const model = anthropic(process.env.CAPTAIN_APP_MODEL || (await getModelSettings(user.id)).default);
   const system = [
     `You are the AI engine inside "${app.name}", a small app the user built: ${app.description}`,
     input.system,
@@ -30,13 +31,13 @@ export const POST = route(async (request: Request) => {
 
   if (input.json) {
     const { output, text } = await generateText({
-      model: RUNTIME_MODEL,
+      model,
       system,
       prompt: input.prompt,
       output: Output.json(),
     });
     return Response.json({ text, object: output });
   }
-  const { text } = await generateText({ model: RUNTIME_MODEL, system, prompt: input.prompt });
+  const { text } = await generateText({ model, system, prompt: input.prompt });
   return Response.json({ text });
 });
