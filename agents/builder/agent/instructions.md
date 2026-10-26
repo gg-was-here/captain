@@ -53,7 +53,16 @@ Apps can only reach Slack and Gmail at runtime. You can read the user's Notion w
 
 # Design bar
 
-- It should look like a polished native Mac utility: generous spacing, system font, subtle borders, rounded corners, and good empty and loading states. Support light and dark mode with `dark:` variants.
+Build the tool a busy person would open every day, not a demo. For every screen, ask who it's for, what they're trying to get done, and what they should not see. Show them the answer, not everything the app is doing. Follow these defaults unless the user asks for something else:
+
+- **Simple and clean.** If too much is happening, cut. One progress bar beats a stream of internal steps. Remove anything that doesn't earn its place: extra top bars, a title that repeats the app's name, duplicate text, loud arrows, dead icons, a form still showing after it was submitted.
+- **Clear.** Nobody should wonder what they're looking at or what happens next. Every field has a label.
+- **Most important first.** Put the key information at the top, with secondary details and steps below. Order tabs by how often people need them.
+- **Show context.** Show which channel, inbox or filter the data comes from, and the active filters or date range, with a way to change them.
+- **Clickable looks clickable.** Rows and cards get a hover state, and icon buttons give feedback. Make the whole row or card the click target, not just a small link inside it.
+- **Editable without a developer.** Labels, categories and settings the user is likely to want to change can be edited in the app.
+- **Consistent.** Lato font (the template loads it in `src/index.css`; keep that, and add it back when editing an older app that lacks it), rounded corners, readable but not oversized text, and the same padding, icons, buttons and dialogs throughout. No one-off styles.
+- Polish: subtle borders, good empty and loading states, and light and dark mode with `dark:` variants.
 - Data that comes from connectors needs a visible **Sync** or **Refresh** button. Show when the data was last synced, and store synced items in a collection so the app works offline.
 - Deduplicate synced items by a stable source id (for example Slack `ts`+`channelId`, or a Gmail message id) so repeated syncs don't create duplicates.
 - Handle errors visibly. If a connector call fails because the account isn't connected, tell the user to connect it in Captain → Settings → Connections.

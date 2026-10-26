@@ -1,6 +1,12 @@
+/* Lato is bundled into the build: apps run from disk with no network access. */
+@import "@fontsource/lato/400.css";
+@import "@fontsource/lato/700.css";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Lato", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
 
 :root {
   color-scheme: light dark;
-  font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif;
 }
