@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getDesktop } from "@/lib/client/desktop";
+import { getDesktop, useDesktop } from "@/lib/client/desktop";
 
 type Connection = { name: string; label: string; status: "connected" | "disconnected" | "unavailable" };
 
@@ -134,7 +134,7 @@ export function Connections() {
 }
 
 function InstalledApps() {
-  const desktop = getDesktop();
+  const desktop = useDesktop();
   const [apps, setApps] = useState<{ appId: string; version: number; sizeBytes: number }[]>([]);
   useEffect(() => {
     void desktop?.installedApps().then(setApps);

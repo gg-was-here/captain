@@ -17,6 +17,12 @@ function createDb() {
  * Keep in sync with `schema.ts`; production uses `drizzle-kit push`.
  */
 async function migrate(client: ReturnType<typeof createClient>) {
+  if (databaseUrl().startsWith("file:")) {
+    // Local dev: the web server and every bot server share this file. WAL lets readers and a writer
+    // overlap, and the busy timeout waits for another process's write instead of failing with SQLITE_BUSY.
+    await client.execute("PRAGMA busy_timeout = 5000");
+    await client.execute("PRAGMA journal_mode = WAL");
+  }
   await client.batch(
     [
       `CREATE TABLE IF NOT EXISTS threads (
@@ -37,6 +43,9 @@ async function migrate(client: ReturnType<typeof createClient>) {
       `CREATE TABLE IF NOT EXISTS usage (
         user_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, day, kind))`,
+      `CREATE TABLE IF NOT EXISTS user_settings (
+        user_id TEXT PRIMARY KEY, default_model TEXT, builder_model TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
     ],
     "write",
   );

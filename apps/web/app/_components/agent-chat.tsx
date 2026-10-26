@@ -3,7 +3,7 @@
 import type { UserContent } from "ai";
 import { type EveMessage, useEveAgent } from "eve/react";
 import { AlertCircleIcon, SquareIcon } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -26,6 +26,7 @@ import { refreshSidebar } from "@/lib/client/events";
 import { AgentMessage } from "./agent-message";
 import { AttachButton, AttachmentChips, MicButton } from "./composer-buttons";
 import { ConnectPrompt } from "./connect-prompt";
+import { AppReadyCard } from "./tool-results";
 import { NewThreadMenu } from "./new-thread-dialog";
 
 export interface ChatBot {
@@ -78,6 +79,7 @@ export function AgentChat({
   const threadId = useRef(initialThreadId);
   const firstMessage = useRef<string>("");
   const creatingThread = useRef<Promise<void> | undefined>(undefined);
+  const currentSessionId = useRef(sessionId);
 
   const savePreview = (preview: string) => {
     if (!threadId.current || !preview) return;
@@ -138,12 +140,14 @@ export function AgentChat({
           },
     resume: sessionId !== undefined,
     onSessionChange(session) {
+      if (session !== undefined) currentSessionId.current = session.sessionId;
       if (hasSubmittedMessage.current && session !== undefined) {
         ensureThread(session.sessionId);
       }
     },
     onFinish() {
       savePreview(latestText.current);
+      checkDelegatedBuilds();
     },
   });
 
@@ -163,29 +167,70 @@ export function AgentChat({
     }
   }, [agent.data.messages]);
 
-  // When Builder finishes a version, link the app to this thread and open it in the Space.
+  // When a version is built, link the app to this thread and open it in the Space.
   const announced = useRef(new Set<string>());
+  const announce = useCallback(
+    (key: string, built: BuiltApp) => {
+      if (announced.current.has(key)) return;
+      announced.current.add(key);
+      onAppBuilt?.(built);
+      void (creatingThread.current ?? Promise.resolve()).then(() => {
+        if (!threadId.current) return;
+        void fetch(`/api/threads/${threadId.current}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ appId: built.appId }),
+        }).then(refreshSidebar);
+      });
+    },
+    [onAppBuilt],
+  );
+
+  // Builder threads: package_app results arrive in this thread's own stream.
   useEffect(() => {
     for (const message of agent.data.messages) {
       for (const part of message.parts) {
         if (part.type !== "dynamic-tool" || part.state !== "output-available") continue;
         if (!part.toolName.endsWith("package_app")) continue;
         const output = part.output as { ok?: boolean } & Partial<BuiltApp>;
-        if (!output?.ok || !output.appId || announced.current.has(part.toolCallId)) continue;
-        announced.current.add(part.toolCallId);
-        const built = output as BuiltApp;
-        onAppBuilt?.(built);
-        void (creatingThread.current ?? Promise.resolve()).then(() => {
-          if (!threadId.current) return;
-          void fetch(`/api/threads/${threadId.current}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ appId: built.appId }),
-          }).then(refreshSidebar);
-        });
+        if (output?.ok && output.appId) announce(part.toolCallId, output as BuiltApp);
       }
     }
-  }, [agent.data.messages, onAppBuilt]);
+  }, [agent.data.messages, announce]);
+
+  // Captain threads: Builder runs as a hidden subagent, so its package_app result never reaches
+  // this stream. create_app links the app to this (root) session instead; check after each turn.
+  // Versions that already existed when the chat opened are not announced again.
+  const knownVersions = useRef<Promise<void> | undefined>(undefined);
+  const delegatedApps = useCallback(async (): Promise<(BuiltApp & { key: string })[]> => {
+    const session = currentSessionId.current;
+    if (!session) return [];
+    const response = await fetch("/api/apps").catch(() => null);
+    if (!response?.ok) return [];
+    const { apps } = (await response.json()) as {
+      apps: { id: string; name: string; icon: string; threadId: string | null; currentVersion: number }[];
+    };
+    return apps
+      .filter((a) => a.threadId === session && a.currentVersion > 0)
+      .map((a) => ({ key: `${a.id}@${a.currentVersion}`, appId: a.id, version: a.currentVersion, name: a.name, icon: a.icon }));
+  }, []);
+  // Shown as Launch cards at the end of a Captain thread, like Builder's own package_app cards.
+  const [delegated, setDelegated] = useState<BuiltApp[]>([]);
+  useEffect(() => {
+    if (bot.agent !== "captain") return;
+    knownVersions.current = delegatedApps().then((apps) => {
+      for (const app of apps) announced.current.add(app.key);
+      setDelegated(apps);
+    });
+  }, [bot.agent, delegatedApps]);
+  const checkDelegatedBuilds = () => {
+    if (bot.agent !== "captain") return;
+    void (knownVersions.current ?? Promise.resolve()).then(async () => {
+      const apps = await delegatedApps();
+      setDelegated(apps);
+      for (const { key, ...built } of apps) announce(key, built);
+    });
+  };
 
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isResuming = agent.status === "resuming";
@@ -203,7 +248,7 @@ export function AgentChat({
     lastMessage?.role === "assistant" && !showPendingThinking ? activityOf(lastMessage) : "Thinking";
   const showLoader = isBusy && !awaitingUser && activity !== undefined;
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
-  const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
+  const errorMessage = cancellationError ?? explainSendError(agent.error?.message, sessionId) ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
   // A saved thread always opens as a chat: its name on top, the composer at the bottom.
   const showConversationLayout = isResuming || hasConversationContent || initialThreadId !== undefined;
@@ -337,6 +382,9 @@ export function AgentChat({
                 />
               ),
             )}
+            {delegated.map((app) => (
+              <AppReadyCard key={app.appId} output={{ ok: true, ...app }} />
+            ))}
             {showLoader ? <PendingThinking icon={bot.icon} label={activity} /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
@@ -419,6 +467,17 @@ function ComposerAction({
       <SquareIcon className="size-3 fill-current" />
     </PromptInputButton>
   );
+}
+
+/**
+ * Local `eve dev` leaves conversations from before its last restart dormant, and sending to one fails
+ * with eve's generic send error. Production runs are durable, so this only explains it in development,
+ * for threads that existed before this page loaded.
+ */
+function explainSendError(message: string | undefined, savedSessionId: string | undefined) {
+  if (process.env.NODE_ENV !== "development" || savedSessionId === undefined) return message;
+  if (message !== "Failed to send the session message.") return message;
+  return "This chat can't continue: it started before the local dev server last restarted, and eve dev doesn't resume older chats. Start a new chat to keep going.";
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {

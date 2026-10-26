@@ -3,6 +3,7 @@ import Link from "next/link";
 import { roundButton } from "@/lib/utils";
 import { Account } from "./account";
 import { Connections } from "./connections";
+import { Models } from "./models";
 
 export const metadata = { title: "Settings · Captain" };
 
@@ -17,6 +18,7 @@ export default function SettingsPage() {
           </Link>
         </div>
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? <Account /> : null}
+        <Models />
         <Connections />
       </div>
     </main>

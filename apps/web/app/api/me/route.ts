@@ -12,7 +12,7 @@ export const GET = route(async (request: Request) => {
   return Response.json({ user: { id: user.id, name: user.name ?? null, email: user.email ?? null } });
 });
 
-/** Delete the account: connector tokens, threads, apps and their bundles, usage, then the Clerk user. */
+/** Delete the account: connector tokens, threads, apps and their bundles, usage, settings, then the Clerk user. */
 export const DELETE = route(async (request: Request) => {
   const user = await requireUser(request);
   await Promise.allSettled(CONNECTOR_NAMES.map((name) => disconnect(user, name)));
@@ -31,6 +31,7 @@ export const DELETE = route(async (request: Request) => {
   await db.delete(schema.apps).where(eq(schema.apps.userId, user.id));
   await db.delete(schema.threads).where(eq(schema.threads.userId, user.id));
   await db.delete(schema.usage).where(eq(schema.usage.userId, user.id));
+  await db.delete(schema.userSettings).where(eq(schema.userSettings.userId, user.id));
 
   if (clerkConfigured()) await (await clerkClient()).users.deleteUser(user.id);
   return new Response(null, { status: 204 });

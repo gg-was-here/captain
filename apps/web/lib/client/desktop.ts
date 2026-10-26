@@ -5,6 +5,8 @@
  *
  * Keep in sync with apps/desktop/src/preload/index.ts.
  */
+import { useSyncExternalStore } from "react";
+
 export type AppRecord = { id: string; createdAt: string; updatedAt: string; [field: string]: unknown };
 
 export type AppDataChange =
@@ -42,3 +44,13 @@ declare global {
 
 export const getDesktop = (): CaptainDesktop | undefined =>
   typeof window === "undefined" ? undefined : window.captainDesktop;
+
+const subscribeNever = () => () => {};
+
+/**
+ * `getDesktop()` for rendering. `undefined` while hydrating (the server can't know, so this
+ * matches its HTML), then the Mac app bridge, or `null` in a plain browser.
+ */
+export function useDesktop(): CaptainDesktop | null | undefined {
+  return useSyncExternalStore(subscribeNever, () => window.captainDesktop ?? null, () => undefined);
+}

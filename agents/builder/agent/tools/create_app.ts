@@ -26,7 +26,10 @@ export default defineTool({
     await consumeUsage(userId, "builds");
     const appId = `app_${nanoid(10)}`;
     const db = await getDb();
-    await db.insert(schema.apps).values({ id: appId, userId, threadId: ctx.session.id, ...input });
+    // When Captain delegates, this is a hidden child session: link the app to the user's Captain
+    // thread (the root session) so "Edit app" can find it.
+    const threadId = ctx.session.parent?.rootSessionId ?? ctx.session.id;
+    await db.insert(schema.apps).values({ id: appId, userId, threadId, ...input });
 
     const sandbox = await ctx.getSandbox();
     const dir = `/workspace/apps/${appId}`;
@@ -36,6 +39,11 @@ export default defineTool({
       command: `sed -i 's#<title>.*</title>#<title>${input.name.replace(/[#&/\\]/g, "")}</title>#' index.html`,
       workingDirectory: dir,
     });
-    return { appId, dir, next: "Write the app in src/ (start with src/App.tsx), then call package_app." };
+    return {
+      appId,
+      dir,
+      next:
+        "Read src/App.tsx (file tools refuse to overwrite a file you haven't read), replace it with the app, add any components in src/, then call package_app once the code is written.",
+    };
   },
 });
