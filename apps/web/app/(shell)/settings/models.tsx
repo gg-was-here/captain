@@ -9,7 +9,7 @@ type Role = "default" | "builder";
 type Settings = Record<Role, string>;
 
 const ROLES: { role: Role; label: string; description: string }[] = [
-  { role: "default", label: "Default model", description: "Used by Captain, each app's bot, and AI calls from your apps." },
+  { role: "default", label: "Default model", description: "Used by Bambii, each app's bot, and AI calls from your apps." },
   { role: "builder", label: "App building model", description: "Used by Builder to write and fix your apps' code." },
 ];
 

@@ -11,6 +11,9 @@ import * as store from "./store";
  */
 const ORIGIN = new URL(process.env.CAPTAIN_URL ?? require("../../package.json").captainUrl).origin;
 
+// The app is called Bambii, but its data (installed apps, sign-in) stays in the folder it had as Captain.
+app.setPath("userData", join(app.getPath("appData"), "Captain"));
+
 registerAppScheme();
 app.setAsDefaultProtocolClient("captain");
 
@@ -43,7 +46,7 @@ function createWindow() {
   });
 
   // Google and some OAuth providers refuse embedded browsers that advertise Electron.
-  const ua = window.webContents.getUserAgent().replace(/\s(Electron|Captain)\/\S+/g, "");
+  const ua = window.webContents.getUserAgent().replace(/\s(Electron|Captain|Bambii)\/\S+/g, "");
   window.webContents.setUserAgent(ua);
 
   // Links to other sites open in the default browser, except OAuth flows started by Captain.

@@ -12,7 +12,7 @@ export default async function DesktopConnectedPage({
     <main className="flex h-dvh items-center justify-center p-6">
       <div className="max-w-sm text-center">
         <h1 className="font-semibold text-lg">{label} is connected</h1>
-        <p className="mt-2 text-muted-foreground text-sm">You can close this tab and go back to Captain.</p>
+        <p className="mt-2 text-muted-foreground text-sm">You can close this tab and go back to Bambii.</p>
       </div>
     </main>
   );

@@ -113,7 +113,7 @@ export function Sidebar() {
           <span className="flex size-14 items-center justify-center rounded-full bg-foreground text-3xl shadow-sm">
             🧭
           </span>
-          <span className="font-medium text-xs">Captain</span>
+          <span className="font-medium text-xs">Bambii</span>
         </Link>
       )}
 

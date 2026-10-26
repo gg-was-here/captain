@@ -24,7 +24,7 @@ process.stdout.write(JSON.stringify({ dist, source }));
 
 export default defineTool({
   description:
-    "Type-check and build the app, then save it as a new version. On success the user's Captain desktop app downloads it onto their Mac and opens it. On failure, fix the reported errors and call again.",
+    "Type-check and build the app, then save it as a new version. On success the user's Bambii desktop app downloads it onto their Mac and opens it. On failure, fix the reported errors and call again.",
   inputSchema: z.object({
     appId: z.string(),
     notes: z.string().max(200).describe("One line describing what changed in this version"),

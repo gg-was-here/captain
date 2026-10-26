@@ -19,7 +19,7 @@ export class HttpError extends Error {
 
 export async function requireUser(request?: Request): Promise<CaptainUser> {
   const user = await currentUser(request);
-  if (!user) throw new HttpError(401, "Sign in to Captain");
+  if (!user) throw new HttpError(401, "Sign in to Bambii");
   return user;
 }
 

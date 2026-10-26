@@ -9,7 +9,7 @@ export default function RootError({ error, retry }: { readonly error: Error & { 
   return (
     <div className="flex h-dvh">
       <ErrorState actions={<Button onClick={() => retry()}>Try again</Button>} title="Something went wrong">
-        Captain couldn't load this page.
+        Bambii couldn't load this page.
       </ErrorState>
     </div>
   );

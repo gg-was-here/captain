@@ -1,9 +1,9 @@
-# Captain
+# Bambii
 
 A Mac app for chatting with bots that work inside your Slack, Gmail and Notion. Bots can also build small apps that are stored and run on your Mac.
 
 ```
-Captain.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js, apps/web) ──mounts──▶ Bots (eve, agents/*)
+Bambii.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js, apps/web) ──mounts──▶ Bots (eve, agents/*)
    └─ Space: built apps run from disk                         │                                   │
       over captain-app://, with the window.captain bridge     └─ Turso/SQLite · Vercel Blob        └─ Vercel Connect · Vercel Sandbox
 ```
@@ -18,7 +18,7 @@ Captain.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js,
 | `apps/web` | Threads, sidebar, Space panel, settings, and the runtime APIs that built apps call. |
 | `apps/desktop` | Electron shell. Downloads app bundles into `~/Library/Application Support/Captain/apps`, keeps each app's data in SQLite, and enforces per-app connector permissions. |
 
-Each user picks two Claude models in **Settings → Models**: a default model for Captain, app bots and AI calls from apps (Haiku 5.5 unless changed), and an app building model for Builder (Opus 5.5 unless changed). `CAPTAIN_APP_MODEL` forces one model for every app's AI calls.
+Each user picks two Claude models in **Settings → Models**: a default model for Bambii, app bots and AI calls from apps (Haiku 5.5 unless changed), and an app building model for Builder (Opus 5.5 unless changed). `CAPTAIN_APP_MODEL` forces one model for every app's AI calls.
 
 ## How an app gets built
 1. In a thread, you ask Builder for something, e.g. "build a task tracker from my Slack messages".
@@ -37,7 +37,7 @@ Node 24 is pinned in `.node-version` and `.nvmrc` (`nvm use` picks it up). `npm 
 nvm use
 npm install
 npm run dev        # web UI + all bots at http://localhost:3000
-npm run desktop    # Captain.app pointed at localhost (in another terminal)
+npm run desktop    # Bambii.app pointed at localhost (in another terminal)
 ```
 
 Without Clerk keys, local dev runs as a single `local-user`, and data goes to `.data/captain.db`.
@@ -79,7 +79,7 @@ Set `captainUrl` in `apps/desktop/package.json` to your deployment URL. Then bui
 export CSC_LINK=… CSC_KEY_PASSWORD=…                         # Developer ID Application certificate
 export APPLE_ID=… APPLE_APP_SPECIFIC_PASSWORD=… APPLE_TEAM_ID=…
 export CAPTAIN_UPDATES_URL=https://…/desktop                  # where release/*.zip + latest-mac.yml are hosted
-npm run desktop:dist                                          # → apps/desktop/release/Captain-<version>-arm64.dmg
+npm run desktop:dist                                          # → apps/desktop/release/Bambii-<version>-arm64.dmg
 ```
 
 Gmail's read scopes are *restricted*. A public launch needs Google's OAuth verification and a CASA security assessment, so start that early. Until then, test users work.

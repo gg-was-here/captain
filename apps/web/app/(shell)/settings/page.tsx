@@ -5,7 +5,7 @@ import { Account } from "./account";
 import { Connections } from "./connections";
 import { Models } from "./models";
 
-export const metadata = { title: "Settings · Captain" };
+export const metadata = { title: "Settings · Bambii" };
 
 export default function SettingsPage() {
   return (

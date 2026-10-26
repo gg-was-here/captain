@@ -7,7 +7,7 @@ export interface BotInfo {
 }
 
 export const SYSTEM_BOTS: BotInfo[] = [
-  { agent: "captain", name: "Captain", icon: "🧭", tagline: "Ask anything — searches the web and works in your Slack, Gmail and Notion" },
+  { agent: "captain", name: "Bambii", icon: "🧭", tagline: "Ask anything — searches the web and works in your Slack, Gmail and Notion" },
   { agent: "builder", name: "Builder", icon: "🛠️", tagline: "Describe an app and it gets built onto your Mac" },
 ];
 

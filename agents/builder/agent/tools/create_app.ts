@@ -7,7 +7,7 @@ import { TEMPLATE_DIR } from "../sandbox";
 
 export default defineTool({
   description:
-    "Start a new Captain app: registers it and copies the starter template into /workspace/apps/<appId>. Call once per app, before writing any code.",
+    "Start a new Bambii app: registers it and copies the starter template into /workspace/apps/<appId>. Call once per app, before writing any code.",
   inputSchema: z.object({
     name: z.string().min(1).max(40),
     description: z.string().max(300),
@@ -26,7 +26,7 @@ export default defineTool({
   label: { start: ({ name }) => `Create app “${name}”` },
   async execute(input, ctx) {
     const userId = ctx.session.auth.current?.principalId;
-    if (!userId) throw new Error("Sign in to Captain to build apps.");
+    if (!userId) throw new Error("Sign in to Bambii to build apps.");
     await consumeUsage(userId, "builds");
     const appId = `app_${nanoid(10)}`;
     const db = await getDb();

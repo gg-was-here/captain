@@ -13,7 +13,7 @@ export function Account() {
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
-      "Delete your Captain account? This removes your threads, apps and connections and can't be undone. Apps already downloaded to a Mac keep their local data until you delete them in Finder.",
+      "Delete your Bambii account? This removes your threads, apps and connections and can't be undone. Apps already downloaded to a Mac keep their local data until you delete them in Finder.",
     );
     if (!confirmed) return;
     setDeleting(true);
@@ -47,7 +47,7 @@ export function Account() {
       <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
         <div className="min-w-0 flex-1">
           <div className="font-medium">Delete account</div>
-          <p className="mt-0.5 text-muted-foreground text-sm">Permanently remove your account and everything Captain stores for you.</p>
+          <p className="mt-0.5 text-muted-foreground text-sm">Permanently remove your account and everything Bambii stores for you.</p>
           {error ? <p className="mt-1 text-destructive text-sm">{error}</p> : null}
         </div>
         <Button disabled={deleting} onClick={() => void deleteAccount()} size="sm" variant="destructive">

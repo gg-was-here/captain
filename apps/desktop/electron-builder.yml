@@ -1,5 +1,5 @@
 appId: app.captain.desktop
-productName: Captain
+productName: Bambii
 directories:
   output: release
   buildResources: build
@@ -7,7 +7,7 @@ files:
   - dist/**
   - package.json
 protocols:
-  - name: Captain
+  - name: Bambii
     schemes: [captain]
 mac:
   category: public.app-category.productivity
@@ -23,7 +23,7 @@ mac:
   # Set CSC_LINK / CSC_KEY_PASSWORD (Developer ID cert) and APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID to sign + notarize.
   notarize: true
 dmg:
-  title: Captain
+  title: Bambii
 publish:
   provider: generic
   url: ${env.CAPTAIN_UPDATES_URL}

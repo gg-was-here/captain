@@ -1,6 +1,6 @@
 import { HandoffToDesktop } from "./handoff";
 
-export const metadata = { title: "Sign in to Captain for Mac" };
+export const metadata = { title: "Sign in to Bambii for Mac" };
 
 /** Opened in the default browser by the Mac app; see apps/desktop/src/main/auth.ts. */
 export default async function DesktopSignInPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -12,7 +12,7 @@ export default async function DesktopSignInPage({ searchParams }: { searchParams
       {valid ? (
         <HandoffToDesktop port={portNumber} state={state} />
       ) : (
-        <p className="text-muted-foreground text-sm">This sign-in link is invalid. Start again from the Captain app.</p>
+        <p className="text-muted-foreground text-sm">This sign-in link is invalid. Start again from the Bambii app.</p>
       )}
     </main>
   );

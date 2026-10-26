@@ -91,7 +91,7 @@ export function Connections() {
       <section className="mt-8">
         <h2 className="font-medium text-lg">Connections</h2>
         <p className="mt-1 text-muted-foreground text-sm">
-          Each connection is authorized as you and shared by its bot, by Captain, and by the apps you allow.
+          Each connection is authorized as you and shared by its bot, by Bambii, and by the apps you allow.
         </p>
         {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
         {notice ? <p className="mt-3 text-sm">{notice}</p> : null}
@@ -106,7 +106,7 @@ export function Connections() {
                 </div>
                 <p className="mt-0.5 text-muted-foreground text-sm">
                   {c.status === "unavailable"
-                    ? `${c.label} isn't set up on this Captain server yet. Ask your Captain admin to add it.`
+                    ? `${c.label} isn't set up on this Bambii server yet. Ask your Bambii admin to add it.`
                     : DESCRIPTIONS[c.name]}
                 </p>
               </div>

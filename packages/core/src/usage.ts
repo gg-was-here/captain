@@ -11,7 +11,7 @@ const DEFAULTS = { messages: 200, ai: 500, builds: 20 } as const;
 export type UsageKind = keyof typeof DEFAULTS;
 
 const LABELS: Record<UsageKind, string> = {
-  messages: "messages to Captain's bots",
+  messages: "messages to Bambii's bots",
   ai: "AI requests from your apps",
   builds: "new apps",
 };

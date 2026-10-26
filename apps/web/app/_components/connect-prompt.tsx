@@ -27,7 +27,7 @@ export function ConnectPrompt() {
     >
       <span className="font-medium">Connect {names}</span>
       <span className="mt-0.5 block text-muted-foreground">
-        Captain's bots and your apps work with your accounts once they're connected. Open Settings →
+        Bambii's bots and your apps work with your accounts once they're connected. Open Settings →
       </span>
     </Link>
   );

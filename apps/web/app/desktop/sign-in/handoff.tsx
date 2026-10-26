@@ -42,13 +42,13 @@ export function HandoffToDesktop({ port, state }: { port: number; state: string 
 
   return (
     <div className="w-full max-w-sm rounded-xl border bg-card p-6 text-center">
-      <h1 className="font-semibold text-lg">Sign in to Captain for Mac</h1>
+      <h1 className="font-semibold text-lg">Sign in to Bambii for Mac</h1>
       <p className="mt-2 text-muted-foreground text-sm">
         Continue as {user?.primaryEmailAddress?.emailAddress ?? user?.fullName ?? "you"}?
       </p>
       {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
       <Button className="mt-5 w-full" disabled={status !== "idle"} onClick={() => void openApp()}>
-        {status === "sent" ? "Returning to Captain…" : "Open Captain"}
+        {status === "sent" ? "Returning to Bambii…" : "Open Bambii"}
       </Button>
       <button
         className="mt-3 text-muted-foreground text-sm underline-offset-4 hover:underline"

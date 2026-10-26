@@ -11,9 +11,9 @@ import { type BrowserWindow, shell } from "electron";
  */
 const TIMEOUT_MS = 10 * 60 * 1000;
 
-const DONE_PAGE = `<!doctype html><meta charset="utf-8"><title>Captain</title>
+const DONE_PAGE = `<!doctype html><meta charset="utf-8"><title>Bambii</title>
 <body style="font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;margin:0;color:#333">
-<p>You're signed in. You can close this tab and return to Captain.</p>`;
+<p>You're signed in. You can close this tab and return to Bambii.</p>`;
 
 let pending: Server | undefined;
 

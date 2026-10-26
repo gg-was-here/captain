@@ -46,12 +46,12 @@ export const POST = route(async (request: Request) => {
   }
 
   const token = await userToken(user, connector as AppActionConnector);
-  if (!token) throw new HttpError(412, `Connect ${connector} in Captain → Settings → Connections`);
+  if (!token) throw new HttpError(412, `Connect ${connector} in Bambii → Settings → Connections`);
   try {
     return Response.json({ result: await spec.run(token, parsed as never) });
   } catch (error) {
     if (error instanceof ConnectorAuthError) {
-      throw new HttpError(412, `Reconnect ${connector} in Captain → Settings → Connections`);
+      throw new HttpError(412, `Reconnect ${connector} in Bambii → Settings → Connections`);
     }
     throw error;
   }

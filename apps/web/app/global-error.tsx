@@ -8,10 +8,10 @@ export default function GlobalError({ error, retry }: { readonly error: Error & 
   return (
     <html lang="en">
       <body style={{ fontFamily: "system-ui, sans-serif", display: "flex", height: "100dvh", margin: 0, alignItems: "center", justifyContent: "center" }}>
-        <title>Captain</title>
+        <title>Bambii</title>
         <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 600 }}>Captain hit a problem</h1>
-          <p style={{ color: "#666", fontSize: 14 }}>Something went wrong while loading Captain.</p>
+          <h1 style={{ fontSize: 18, fontWeight: 600 }}>Bambii hit a problem</h1>
+          <p style={{ color: "#666", fontSize: 14 }}>Something went wrong while loading Bambii.</p>
           <button onClick={() => retry()} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "1px solid #ccc", background: "#111", color: "#fff", cursor: "pointer" }} type="button">
             Try again
           </button>

@@ -8,7 +8,7 @@ export default function NotFound() {
       <ErrorState
         actions={
           <Button asChild>
-            <Link href="/">Back to Captain</Link>
+            <Link href="/">Back to Bambii</Link>
           </Button>
         }
         title="Page not found"

@@ -1,6 +1,6 @@
 import { UserProfile } from "@clerk/nextjs";
 
-export const metadata = { title: "Account · Captain" };
+export const metadata = { title: "Account · Bambii" };
 
 /** Profile, security and passkeys. The Mac app opens this in the default browser so passkey setup works. */
 export default function AccountPage() {

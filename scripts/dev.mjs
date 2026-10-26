@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 
 // eve's dev servers refuse to start on older Node, with an error that's easy to miss in the output.
 if (Number(process.versions.node.split(".")[0]) < 24) {
-  console.error(`Captain needs Node 24 or newer (you're on ${process.version}). Run \`nvm use\` (reads .nvmrc), then try again.`);
+  console.error(`Bambii needs Node 24 or newer (you're on ${process.version}). Run \`nvm use\` (reads .nvmrc), then try again.`);
   process.exit(1);
 }
 

@@ -9,7 +9,7 @@ export default function ShellError({ error, retry }: { readonly error: Error & {
   useEffect(() => console.error(error), [error]);
   return (
     <ErrorState actions={<Button onClick={() => retry()}>Try again</Button>} title="Something went wrong">
-      Captain couldn't load this page. Try again, or pick another thread from the sidebar.
+      Bambii couldn't load this page. Try again, or pick another thread from the sidebar.
     </ErrorState>
   );
 }

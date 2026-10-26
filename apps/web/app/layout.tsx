@@ -10,7 +10,7 @@ const sans = Geist({ variable: "--font-sans", subsets: ["latin"], weight: "varia
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"], weight: "variable", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Captain",
+  title: "Bambii",
   description: "Chat with bots for Slack, Gmail and Notion — and build apps that run on your Mac.",
 };
 

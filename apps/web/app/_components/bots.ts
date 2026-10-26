@@ -4,7 +4,7 @@ import type { ChatBot } from "./agent-chat";
 
 const INTROS: Record<string, string> = {
   captain:
-    "Captain connects with your applications. Talk to it 24/7, hand it tasks, and have it build apps of your own.",
+    "Bambii connects with your applications. Talk to it 24/7, hand it tasks, and have it build apps of your own.",
 };
 
 const SUGGESTIONS: Record<string, string[]> = {
