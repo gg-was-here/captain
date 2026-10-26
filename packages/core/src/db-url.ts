@@ -19,5 +19,6 @@ export function localDataDir(): string {
 
 /** Turso/libSQL in production (`DATABASE_URL`), a local SQLite file otherwise. */
 export function databaseUrl(): string {
-  return process.env.DATABASE_URL ?? process.env.TURSO_DATABASE_URL ?? `file:${join(localDataDir(), "captain.db")}`;
+  // `||`, not `??`: a blanked-out variable (e.g. in .env.development.local) means "unset".
+  return process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL || `file:${join(localDataDir(), "captain.db")}`;
 }

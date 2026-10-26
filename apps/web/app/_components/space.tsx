@@ -40,8 +40,10 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
         setError(e instanceof Error ? e.message : String(e));
         setState("error");
       });
+    // Watch ancestors too: the side panel animates its width open while this box keeps its size,
+    // so the box moves without resizing and the native view would stay where it first opened.
     const observer = new ResizeObserver(onResize);
-    observer.observe(host);
+    for (let el: HTMLElement | null = host; el; el = el.parentElement) observer.observe(el);
     window.addEventListener("resize", onResize);
     return () => {
       observer.disconnect();
