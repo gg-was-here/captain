@@ -28,7 +28,8 @@ export function CaptainToolResult({ part }: { readonly part: EveDynamicToolPart 
   }
 }
 
-function AppReadyCard({ output }: { readonly output: Extract<PackageResult, { ok: true }> }) {
+/** "App ready" card with a Launch button that opens the app in the Space. */
+export function AppReadyCard({ output }: { readonly output: Extract<PackageResult, { ok: true }> }) {
   const space = useSpace();
   return (
     <div className="my-2 flex items-center gap-3 rounded-xl border bg-card p-3 shadow-xs">

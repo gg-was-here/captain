@@ -42,15 +42,20 @@ function meteredCaptainAuth(): AuthFn<Request> {
  * - Other bots in this deployment (Vercel OIDC, same project only) may delegate
  *   work and forward the Captain user they act for, so per-user connectors
  *   resolve that user's tokens. They may not assert any other kind of identity.
+ * - Trusted forwarders also pass parent session lineage (`ctx.session.parent`),
+ *   which Builder uses to link a delegated app to the Captain thread.
  */
 export function captainChannel() {
   return eveChannel({
     auth: [meteredCaptainAuth(), vercelOidc()],
     trustedForwarders: (forwarder, assertion) =>
-      forwarder.principalType !== "user" &&
-      forwarder.principalType !== "anonymous" &&
-      assertion.principal !== undefined &&
-      isCaptainUser(assertion.principal.current) &&
-      isCaptainUser(assertion.principal.initiator),
+      // Local dev without Clerk: every caller is the single local user, and peer bots call each other
+      // over plain HTTP (see peers.ts). Trusting it lets subagents see their parent session.
+      (forwarder.authenticator === "captain" && forwarder.issuer === "local") ||
+      (forwarder.principalType !== "user" &&
+        forwarder.principalType !== "anonymous" &&
+        assertion.principal !== undefined &&
+        isCaptainUser(assertion.principal.current) &&
+        isCaptainUser(assertion.principal.initiator)),
   });
 }

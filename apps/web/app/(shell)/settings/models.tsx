@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Model = { id: string; label: string; description: string };
@@ -15,6 +16,7 @@ const ROLES: { role: Role; label: string; description: string }[] = [
 export function Models() {
   const [models, setModels] = useState<Model[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [defaults, setDefaults] = useState<Settings | null>(null);
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<Role>();
 
@@ -24,15 +26,15 @@ export function Models() {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error);
         setModels(body.models);
+        setDefaults(body.defaults);
         setSettings(body.settings);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your model settings."));
   }, []);
 
-  const choose = async (role: Role, id: string) => {
+  const save = async (next: Settings, savedRole?: Role) => {
     if (!settings) return;
     const previous = settings;
-    const next = { ...settings, [role]: id };
     setSettings(next);
     setError(undefined);
     setSaved(undefined);
@@ -43,16 +45,25 @@ export function Models() {
         body: JSON.stringify(next),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't save.");
-      setSaved(role);
+      setSaved(savedRole);
     } catch (e) {
       setSettings(previous);
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
+  const isDefault = !settings || !defaults || (settings.default === defaults.default && settings.builder === defaults.builder);
+
   return (
     <section className="mt-8">
-      <h2 className="font-medium text-lg">Models</h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="font-medium text-lg">Models</h2>
+        {isDefault ? null : (
+          <Button onClick={() => defaults && void save(defaults)} size="sm" variant="ghost">
+            Reset to defaults
+          </Button>
+        )}
+      </div>
       <p className="mt-1 text-muted-foreground text-sm">Changes apply to new messages, including in open threads.</p>
       {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
       <ul className="mt-4 divide-y rounded-xl border bg-card">
@@ -65,7 +76,7 @@ export function Models() {
               </p>
             </div>
             {settings ? (
-              <Select onValueChange={(id) => void choose(role, id)} value={settings[role]}>
+              <Select onValueChange={(id) => void save({ ...settings, [role]: id }, role)} value={settings[role]}>
                 <SelectTrigger aria-label={label} className="w-52" size="sm">
                   {/* Just the name here; descriptions only show in the open menu. */}
                   <SelectValue>{models.find((m) => m.id === settings[role])?.label}</SelectValue>

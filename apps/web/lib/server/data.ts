@@ -52,7 +52,7 @@ export async function getAppVersion(appId: string, version?: number) {
   return row ?? null;
 }
 
-/** The thread where Builder made this app (its threadId column stores the builder's eve session id). */
+/** The thread where this app was made (its threadId column stores that thread's eve session id: Builder's, or Captain's when Captain delegated). */
 export async function findBuildThread(userId: string, sessionId: string | null) {
   if (!sessionId) return null;
   const db = await getDb();

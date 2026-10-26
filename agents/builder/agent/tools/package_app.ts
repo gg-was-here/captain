@@ -5,6 +5,9 @@ import { defineTool } from "eve/tools";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
+/** Comment in the template's placeholder `src/App.tsx` (packages/app-template). */
+const PLACEHOLDER_MARKER = "The builder bot replaces this file.";
+
 /** Prints { dist: {path: base64}, source: {path: utf8} } for the app directory. */
 const COLLECT = `
 const fs = require("fs"), path = require("path");
@@ -37,6 +40,15 @@ export default defineTool({
 
     const sandbox = await ctx.getSandbox();
     const dir = `/workspace/apps/${appId}`;
+    // Models sometimes call this in the same step as their file edits, which packages the untouched starter.
+    const placeholder = await sandbox.run({ command: `grep -q "${PLACEHOLDER_MARKER}" src/App.tsx`, workingDirectory: dir });
+    if (placeholder.exitCode === 0) {
+      return {
+        ok: false as const,
+        errors:
+          "src/App.tsx is still the starter placeholder, so nothing was packaged. Write the app first, wait for the edits to finish, then call package_app on its own (not in the same step as file edits).",
+      };
+    }
     const build = await sandbox.run({ command: "npm run build 2>&1", workingDirectory: dir });
     if (build.exitCode !== 0) {
       return { ok: false as const, errors: build.stdout.slice(-6000) };

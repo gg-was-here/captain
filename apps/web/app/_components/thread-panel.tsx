@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getDesktop } from "@/lib/client/desktop";
+import { useDesktop } from "@/lib/client/desktop";
 import { avatarColor, cn, roundButton } from "@/lib/utils";
 import type { ChatBot } from "./agent-chat";
 import { AppRender, type SpaceApp } from "./space";
@@ -312,7 +312,7 @@ function ApplicationSections({
   readonly buildThreadId?: string | null;
   readonly tab: "Details" | "Render";
 }) {
-  const desktop = getDesktop();
+  const desktop = useDesktop();
   const [reloadKey, setReloadKey] = useState(0);
   const [size, setSize] = useState<FrameSize>("phone");
   if (tab === "Details") {

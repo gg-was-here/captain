@@ -3,7 +3,7 @@
 import type { App } from "@captain/core/schema";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { serveAppBridge } from "@/lib/client/app-bridge";
-import { getDesktop } from "@/lib/client/desktop";
+import { useDesktop } from "@/lib/client/desktop";
 
 export type SpaceApp = Pick<App, "id" | "name" | "icon" | "description" | "currentVersion">;
 
@@ -18,7 +18,7 @@ export const useSpace = () => useContext(SpaceContext);
  * reload the app.
  */
 export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; readonly reloadKey?: number }) {
-  const desktop = getDesktop();
+  const desktop = useDesktop();
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -57,13 +57,13 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
   }, [desktop, reloadKey]);
 
   useEffect(() => {
-    if (desktop || !frameRef.current) return;
+    if (desktop !== null || !frameRef.current) return;
     return serveAppBridge(frameRef.current, app);
   }, [desktop, app.id, app.name, app.currentVersion, reloadKey]);
 
   return (
     <div className="relative size-full" ref={hostRef}>
-      {desktop ? (
+      {desktop === undefined ? null : desktop ? (
         state === "ready" ? null : (
           <Placeholder>{state === "loading" ? `Installing ${app.name} on this Mac…` : `Couldn't open the app: ${error}`}</Placeholder>
         )
