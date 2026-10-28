@@ -19,10 +19,9 @@ export default function DesktopCompletePage() {
       router.replace("/");
       return;
     }
-    // The desktop app sends it in the fragment; older builds used the query string.
-    const ticket =
-      new URLSearchParams(window.location.hash.slice(1)).get("ticket") ??
-      new URLSearchParams(window.location.search).get("ticket");
+    // The desktop app puts the ticket in the fragment, which links into the Mac app (captain://…) can't
+    // carry, so a website can't sign the app into another account.
+    const ticket = new URLSearchParams(window.location.hash.slice(1)).get("ticket");
     history.replaceState(null, "", window.location.pathname);
     if (!ticket) {
       setError("Missing sign-in token.");

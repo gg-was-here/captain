@@ -1,17 +1,22 @@
 import { listWebRecords, onAppDataChanged, putWebRecord, removeWebRecord } from "./app-data";
 
 /**
- * The Captain-page half of the web preview's `window.captain` bridge (the app
- * half is injected by `app/a/[appId]/[[...path]]/bridge.ts`). The app iframe
- * has an opaque origin and no session, so this side owns its data, makes the
- * API calls, and asks the user before any write action.
+ * The Bambii-page half of the web preview's `window.captain` bridge (the app half is injected by
+ * `app/a/[appId]/[[...path]]/bridge.ts`). The app iframe has an opaque origin and no session, so this
+ * side owns its data, makes the API calls, and asks the user before any write action.
+ *
+ * Only the document Bambii loaded into the frame may use the bridge. It gets a private MessagePort in
+ * answer to its first "hello". If the frame then loads anything else (a link, a form, app code changing
+ * `location`), that document can't reach the port; the port is closed and the app reloaded, and the
+ * reloaded app gets a new port once it has finished loading.
  */
 export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name: string }) {
   const runtime = async (kind: "ai" | "connectors", body: Record<string, unknown>, confirmed = false): Promise<any> => {
     const response = await fetch(`/api/runtime/${kind}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(confirmed ? { "x-captain-confirmed": "1" } : {}) },
-      body: JSON.stringify({ appId: app.id, ...body }),
+      // The app id comes last, so app-supplied fields can't redirect a call to another app.
+      body: JSON.stringify({ ...body, appId: app.id }),
     });
     const json = await response.json().catch(() => ({ error: response.statusText }));
     if (response.status === 409 && json.needsConfirmation) {
@@ -28,35 +33,65 @@ export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name
     "db.list": (collection: string) => listWebRecords(app.id, collection),
     "db.put": (collection: string, record: Record<string, unknown>) => putWebRecord(app.id, collection, record),
     "db.remove": (collection: string, id: string) => removeWebRecord(app.id, collection, id),
-    "ai.generate": (request: Record<string, unknown>) => runtime("ai", request),
+    "ai.generate": ({ prompt, system, json }: Record<string, unknown> = {}) => runtime("ai", { prompt, system, json }),
     "connectors.call": async (connector: string, action: string, input: Record<string, unknown>) =>
       (await runtime("connectors", { connector, action, input })).result,
   };
 
-  const post = (message: Record<string, unknown>) => frame.contentWindow?.postMessage(message, "*");
+  let port: MessagePort | undefined;
+  // "waiting": the next hello from the frame gets a port. "connected": a port is out; a hello or a load
+  // means another document. "reloading": the app is being reloaded; hellos wait for its load to finish.
+  let state: "waiting" | "connected" | "reloading" = "waiting";
+  let loads = 0;
 
-  const onMessage = async (event: MessageEvent) => {
-    if (event.source !== frame.contentWindow) return;
-    if (event.data?.captain === "hello") return post({ captain: "ready" });
+  const serve = async (event: MessageEvent) => {
+    const reply = event.target as MessagePort;
     if (event.data?.captain !== "call") return;
     const { id, method, args } = event.data as { id: number; method: string; args: unknown[] };
     try {
-      const handler = methods[method];
+      const handler = Object.hasOwn(methods, method) ? methods[method] : undefined;
       if (!handler) throw new Error(`Unknown method ${method}`);
-      post({ captain: "result", id, result: await handler(...(Array.isArray(args) ? args : [])) });
+      reply.postMessage({ captain: "result", id, result: await handler(...(Array.isArray(args) ? args : [])) });
     } catch (error) {
-      post({ captain: "result", id, error: error instanceof Error ? error.message : String(error) });
+      reply.postMessage({ captain: "result", id, error: error instanceof Error ? error.message : String(error) });
     }
   };
 
+  const reload = () => {
+    port?.close();
+    port = undefined;
+    state = "reloading";
+    loads = 0;
+    frame.src = frame.src;
+  };
+
+  const onMessage = (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.data?.captain !== "hello") return;
+    if (state === "connected") return reload();
+    if (state !== "waiting") return;
+    const channel = new MessageChannel();
+    port = channel.port1;
+    port.onmessage = (message) => void serve(message);
+    frame.contentWindow?.postMessage({ captain: "ready" }, "*", [channel.port2]);
+    state = "connected";
+  };
+
+  // The first load is the document Bambii put in the frame; any later one is a navigation.
+  const onLoad = () => {
+    loads++;
+    if (state === "reloading") state = "waiting";
+    else if (loads > 1) reload();
+  };
+
   window.addEventListener("message", onMessage);
-  // The app may have loaded (and said hello) before this listener existed.
-  post({ captain: "ready" });
+  frame.addEventListener("load", onLoad);
   const stopDataChanged = onAppDataChanged((appId, collection) => {
-    if (appId === app.id) post({ captain: "dataChanged", collection });
+    if (appId === app.id) port?.postMessage({ captain: "dataChanged", collection });
   });
   return () => {
     window.removeEventListener("message", onMessage);
+    frame.removeEventListener("load", onLoad);
     stopDataChanged();
+    port?.close();
   };
 }
