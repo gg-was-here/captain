@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain, Menu, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, type MessageBoxOptions, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { signInWithBrowser } from "./auth";
-import { registerAppBridge, registerAppScheme, SpaceManager } from "./space";
+import { clearAppSession, registerAppBridge, registerAppScheme, SpaceManager } from "./space";
 import * as store from "./store";
 import { deepLinkPath, isExternalUrl, mayShowInWindow } from "./urls";
 
@@ -36,6 +36,26 @@ function isCaptainUrl(url: string) {
 
 function openExternal(url: string) {
   if (isExternalUrl(url)) void shell.openExternal(url);
+}
+
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+
+/**
+ * Shown when Bambii can't be loaded (offline, or the server is down) instead of a blank window. It tries
+ * again on its own when the Mac comes back online, or when the user asks.
+ */
+function failurePage(target: string, reason: string) {
+  const html = `<!doctype html><meta charset="utf-8"><title>Bambii</title>
+<body style="font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;margin:0;color:#333;background:#f7f7f7;-webkit-app-region:drag">
+<div style="text-align:center;max-width:420px;padding:24px;-webkit-app-region:no-drag">
+<p style="font-size:40px;margin:0">🧭</p>
+<h1 style="font-size:20px;font-weight:600;margin:12px 0 8px">Can't reach Bambii</h1>
+<p style="color:#666;margin:0">Check your internet connection. Bambii tries again when you're back online.</p>
+<p style="color:#999;font-size:12px">${escapeHtml(reason)}</p>
+<a href="${escapeHtml(target)}" style="display:inline-block;margin-top:8px;padding:8px 18px;border-radius:999px;background:#111;color:#fff;text-decoration:none">Try again</a>
+</div>
+<script>addEventListener("online", () => location.replace(${JSON.stringify(target).replace(/</g, "\\u003c")}));</script>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
 function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
@@ -79,6 +99,13 @@ function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
   });
 
   window.once("ready-to-show", () => window.show());
+  // A Bambii page that fails to load (ERR_ABORTED just means another navigation replaced it) gets a page
+  // that says so, rather than a blank window that may never even show.
+  window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+    if (!isMainFrame || code === -3 || !isCaptainUrl(url)) return;
+    void window.loadURL(failurePage(url, `${description} (${code})`));
+    if (!window.isVisible()) window.show();
+  });
   void window.loadURL(`${ORIGIN}${startPath}`);
 
   space = new SpaceManager(window, ORIGIN);
@@ -164,6 +191,12 @@ ipcMain.handle("apps:installed", (event) => {
   fromCaptain(event);
   return store.installedApps();
 });
+ipcMain.handle("apps:remove", async (event, appId: string) => {
+  fromCaptain(event);
+  space?.closeApp(appId);
+  await store.removeApp(appId);
+  await clearAppSession(appId);
+});
 ipcMain.on("apps:reveal", (event, appId: string) => {
   if (!isFromCaptain(event)) return;
   shell.showItemInFolder(join(store.appDir(appId), "manifest.json"));
@@ -195,13 +228,42 @@ app.whenReady().then(() => {
     ]),
   );
   createWindow(launchPath);
-  if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify().catch((error: unknown) => console.error("[updater] update check failed", error));
-  }
+  if (app.isPackaged) startUpdates();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Checks for updates at launch and every few hours. A downloaded update installs when Bambii quits, and
+ * the user is offered a restart to get it now.
+ */
+function startUpdates() {
+  // Without a listener, an updater error is an uncaught exception in the main process.
+  autoUpdater.on("error", (error) => console.error("[updater]", error));
+  let offered: string | undefined;
+  autoUpdater.on("update-downloaded", async (info) => {
+    if (offered === info.version) return;
+    offered = info.version;
+    const options: MessageBoxOptions = {
+      type: "info",
+      message: `Bambii ${info.version} is ready`,
+      detail: "Restart to use the new version now, or it installs the next time you quit Bambii.",
+      buttons: ["Restart Now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    };
+    const { response } = await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options));
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+  const check = () => {
+    autoUpdater.checkForUpdates().catch((error: unknown) => console.error("[updater] update check failed", error));
+  };
+  check();
+  setInterval(check, UPDATE_CHECK_MS);
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

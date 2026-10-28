@@ -209,6 +209,15 @@ export function readAllData(appId: string): Record<string, AppRecord[]> {
   return data;
 }
 
+/** Deletes an app and its on-device data from this Mac, once any install of it has finished. */
+export async function removeApp(appId: string): Promise<void> {
+  const dir = appDir(appId);
+  await installs.get(appId)?.catch(() => {});
+  databases.get(appId)?.close();
+  databases.delete(appId);
+  await rm(dir, { recursive: true, force: true });
+}
+
 export function applyChanges(appId: string, changes: AppDataChange[]) {
   const database = db(appId);
   const touched = new Set<string>();

@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld("captainDesktop", {
   applyAppChanges: (appId: string, changes: unknown[]) => ipcRenderer.invoke("apps:apply-changes", appId, changes),
   installedApps: () => ipcRenderer.invoke("apps:installed"),
   revealApp: (appId: string) => ipcRenderer.send("apps:reveal", appId),
+  removeApp: (appId: string) => ipcRenderer.invoke("apps:remove", appId),
 });

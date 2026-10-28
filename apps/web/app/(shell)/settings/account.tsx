@@ -4,6 +4,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, errorText } from "@/lib/client/api";
+import { getDesktop } from "@/lib/client/desktop";
 
 /** Shown only when Clerk is configured. "_blank" opens in the default browser from the Mac app. */
 export function Account() {
@@ -14,7 +15,7 @@ export function Account() {
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
-      "Delete your Bambii account? This removes your threads, apps and connections and can't be undone. Apps already downloaded to a Mac keep their local data until you delete them in Finder.",
+      "Delete your Bambii account? This removes your threads, apps and connections and can't be undone. Apps downloaded to other Macs keep their data there until you remove them in Settings.",
     );
     if (!confirmed) return;
     setDeleting(true);
@@ -25,6 +26,12 @@ export function Account() {
       setError(errorText(e, "Couldn't delete your account."));
       setDeleting(false);
       return;
+    }
+    // The apps are gone from the account, so remove them and their data from this Mac too.
+    const desktop = getDesktop();
+    if (desktop?.removeApp) {
+      const installed = await desktop.installedApps().catch(() => []);
+      await Promise.allSettled(installed.map((app) => desktop.removeApp?.(app.appId)));
     }
     // The account is gone; if signing out fails, a reload lands on sign-in anyway.
     await signOut({ redirectUrl: "/sign-in" }).catch(() => window.location.assign("/sign-in"));

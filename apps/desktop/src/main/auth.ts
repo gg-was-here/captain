@@ -11,9 +11,11 @@ import { type BrowserWindow, shell } from "electron";
  */
 const TIMEOUT_MS = 10 * 60 * 1000;
 
-const DONE_PAGE = `<!doctype html><meta charset="utf-8"><title>Bambii</title>
+const page = (message: string) => `<!doctype html><meta charset="utf-8"><title>Bambii</title>
 <body style="font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;margin:0;color:#333">
-<p>You're signed in. You can close this tab and return to Bambii.</p>`;
+<p>${message}</p>`;
+const DONE_PAGE = page("You're signed in. You can close this tab and return to Bambii.");
+const CLOSED_PAGE = page("Bambii's window was closed. Open Bambii and sign in again.");
 
 let pending: Server | undefined;
 
@@ -28,9 +30,13 @@ export async function signInWithBrowser(window: BrowserWindow, origin: string): 
       response.writeHead(400).end("Invalid sign-in callback");
       return;
     }
-    response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(DONE_PAGE);
+    const closed = window.isDestroyed();
+    // Close idle keep-alive connections too, once the page is sent, so the port is freed.
+    response
+      .writeHead(200, { "content-type": "text/html; charset=utf-8" })
+      .end(closed ? CLOSED_PAGE : DONE_PAGE, () => server.closeAllConnections());
     server.close();
-    if (window.isDestroyed()) return;
+    if (closed) return;
     // In the fragment, so the token never reaches server request logs.
     void window.loadURL(`${origin}/desktop/complete#ticket=${encodeURIComponent(ticket)}`);
     if (window.isMinimized()) window.restore();
@@ -41,12 +47,25 @@ export async function signInWithBrowser(window: BrowserWindow, origin: string): 
     if (pending === server) pending = undefined;
   });
 
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  // Errors after listening (a bad request on a socket) mustn't crash the main process.
+  server.on("error", (error) => console.error("[sign-in] loopback listener", error));
   setTimeout(() => server.close(), TIMEOUT_MS).unref();
 
   const { port } = server.address() as AddressInfo;
   const target = new URL("/desktop/sign-in", origin);
   target.searchParams.set("port", String(port));
   target.searchParams.set("state", state);
-  await shell.openExternal(target.toString());
+  try {
+    await shell.openExternal(target.toString());
+  } catch (error) {
+    server.close();
+    throw new Error("Couldn't open your browser to sign in.", { cause: error });
+  }
 }

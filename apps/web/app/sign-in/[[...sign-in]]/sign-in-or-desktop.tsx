@@ -3,7 +3,7 @@
 import { SignIn, SignUp } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { type CaptainDesktop, getDesktop } from "@/lib/client/desktop";
+import { type CaptainDesktop, desktopErrorText, getDesktop } from "@/lib/client/desktop";
 
 /**
  * In the Mac app, sign-in (and sign-up, which Clerk's hosted page links to)
@@ -25,13 +25,13 @@ export function SignInOrDesktop({ mode = "sign-in" }: { readonly mode?: "sign-in
       await desktop.signInWithBrowser();
       setWaiting(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(desktopErrorText(e));
     }
   };
 
   return (
     <div className="w-80 rounded-xl border bg-card p-6 text-center">
-      <h1 className="font-semibold text-lg">{mode === "sign-up" ? "Create your Bambii account" : "Sign in to Captain"}</h1>
+      <h1 className="font-semibold text-lg">{mode === "sign-up" ? "Create your Bambii account" : "Sign in to Bambii"}</h1>
       <p className="mt-2 text-muted-foreground text-sm">
         {waiting
           ? "Finish signing in in your browser. Bambii will continue automatically."

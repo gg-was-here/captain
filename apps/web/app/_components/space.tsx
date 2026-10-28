@@ -4,7 +4,7 @@ import type { App } from "@captain/core/schema";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { serveAppBridge } from "@/lib/client/app-bridge";
-import { useDesktop } from "@/lib/client/desktop";
+import { desktopErrorText, useDesktop } from "@/lib/client/desktop";
 
 export type SpaceApp = Pick<App, "id" | "name" | "icon" | "description" | "currentVersion">;
 
@@ -43,7 +43,7 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
       .openSpace({ appId: app.id, version: app.currentVersion, bounds: bounds() })
       .then(() => setState("ready"))
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(desktopErrorText(e));
         setState("error");
       });
     // Watch ancestors too: the side panel animates its width open while this box keeps its size,

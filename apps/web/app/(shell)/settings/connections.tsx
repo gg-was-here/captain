@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, errorText } from "@/lib/client/api";
-import { getDesktop, useDesktop } from "@/lib/client/desktop";
+import { desktopErrorText, getDesktop, useDesktop } from "@/lib/client/desktop";
 
 type Connection = { name: string; label: string; status: "connected" | "disconnected" | "unavailable" };
 
@@ -135,9 +135,46 @@ export function Connections() {
 function InstalledApps() {
   const desktop = useDesktop();
   const [apps, setApps] = useState<{ appId: string; version: number; sizeBytes: number }[]>([]);
-  useEffect(() => {
-    void desktop?.installedApps().then(setApps);
+  /** Names of the account's apps; an installed app missing from it was deleted or belongs to someone else. */
+  const [names, setNames] = useState<Map<string, string>>();
+  const [error, setError] = useState<string>();
+  const [removing, setRemoving] = useState<string>();
+
+  const load = useCallback(async () => {
+    if (!desktop) return;
+    try {
+      setApps(await desktop.installedApps());
+    } catch (e) {
+      setError(desktopErrorText(e));
+    }
+    try {
+      const response = await api("/api/apps", undefined, "Couldn't load your apps.");
+      const body = (await response.json()) as { apps: { id: string; name: string }[] };
+      setNames(new Map(body.apps.map((a) => [a.id, a.name])));
+    } catch {
+      // Without names, installed apps are listed by id.
+    }
   }, [desktop]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const remove = async (appId: string, name: string) => {
+    if (!desktop?.removeApp) return;
+    if (!window.confirm(`Remove ${name} from this Mac? Its data on this Mac is deleted too.`)) return;
+    setRemoving(appId);
+    setError(undefined);
+    try {
+      await desktop.removeApp(appId);
+      await load();
+    } catch (e) {
+      setError(`Couldn't remove ${name}: ${desktopErrorText(e)}`);
+    } finally {
+      setRemoving(undefined);
+    }
+  };
+
   if (!desktop) return null;
   return (
     <section className="mt-10">
@@ -145,18 +182,36 @@ function InstalledApps() {
       <p className="mt-1 text-muted-foreground text-sm">
         Built apps and their data live in ~/Library/Application Support/Captain/apps.
       </p>
+      {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
       <ul className="mt-4 divide-y rounded-xl border bg-card">
-        {apps.map((app) => (
-          <li className="flex items-center gap-4 p-4 text-sm" key={app.appId}>
-            <span className="flex-1 font-mono text-xs">{app.appId}</span>
-            <span className="text-muted-foreground">
-              v{app.version} · {(app.sizeBytes / 1024).toFixed(0)} KB
-            </span>
-            <Button onClick={() => desktop.revealApp(app.appId)} size="sm" variant="ghost">
-              Show in Finder
-            </Button>
-          </li>
-        ))}
+        {apps.map((app) => {
+          const name = names?.get(app.appId);
+          const gone = names !== undefined && name === undefined;
+          return (
+            <li className="flex items-center gap-4 p-4 text-sm" key={app.appId}>
+              <span className="min-w-0 flex-1">
+                <span className={name ? "font-medium" : "font-mono text-xs"}>{name ?? app.appId}</span>
+                {gone ? <span className="block text-muted-foreground text-xs">Not in your account anymore</span> : null}
+              </span>
+              <span className="text-muted-foreground">
+                v{app.version} · {(app.sizeBytes / 1024).toFixed(0)} KB
+              </span>
+              <Button onClick={() => desktop.revealApp(app.appId)} size="sm" variant="ghost">
+                Show in Finder
+              </Button>
+              {desktop.removeApp ? (
+                <Button
+                  disabled={removing !== undefined}
+                  onClick={() => void remove(app.appId, name ?? "this app")}
+                  size="sm"
+                  variant={gone ? "outline" : "ghost"}
+                >
+                  {removing === app.appId ? "Removing…" : "Remove"}
+                </Button>
+              ) : null}
+            </li>
+          );
+        })}
         {apps.length === 0 ? <li className="p-4 text-muted-foreground text-sm">No apps installed yet.</li> : null}
       </ul>
     </section>

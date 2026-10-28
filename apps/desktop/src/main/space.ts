@@ -90,6 +90,11 @@ async function appSession(appId: string) {
   return ses;
 }
 
+/** Clears what an app kept in its browser session (storage, caches) when it's removed from this Mac. */
+export async function clearAppSession(appId: string) {
+  await session.fromPartition(`persist:app-${appId}`).clearStorageData();
+}
+
 export interface Bounds {
   x: number;
   y: number;
@@ -174,6 +179,11 @@ export class SpaceManager {
     if (!this.view.webContents.isDestroyed()) this.view.webContents.close();
     this.view = undefined;
     this.appId = undefined;
+  }
+
+  /** Close the Space if it's showing `appId`. */
+  closeApp(appId: string) {
+    if (this.appId === appId) this.close();
   }
 
   /** Tell the open app its data changed (e.g. its bot edited records from the chat). */

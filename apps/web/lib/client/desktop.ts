@@ -34,12 +34,20 @@ export interface CaptainDesktop {
   applyAppChanges(appId: string, changes: AppDataChange[]): Promise<void>;
   installedApps(): Promise<{ appId: string; version: number; sizeBytes: number }[]>;
   revealApp(appId: string): void;
+  /** Delete an app and its on-device data from this Mac. Missing in Mac app versions before it existed. */
+  removeApp?(appId: string): Promise<void>;
 }
 
 declare global {
   interface Window {
     captainDesktop?: CaptainDesktop;
   }
+}
+
+/** The message of an error from the Mac app, without the "Error invoking remote method …" prefix Electron adds. */
+export function desktopErrorText(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/^Error invoking remote method '[^']+': (?:\w*Error: )?/, "");
 }
 
 export const getDesktop = (): CaptainDesktop | undefined =>
