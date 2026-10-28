@@ -7,6 +7,7 @@
     "dev": "node scripts/dev.mjs",
     "start": "next start apps/web",
     "typecheck": "tsc --noEmit -p apps/web && tsc --noEmit",
+    "test": "vitest run",
     "desktop": "npm run dev -w @captain/desktop",
     "desktop:dist": "npm run dist -w @captain/desktop",
     "sync-template": "node scripts/sync-template.mjs"
@@ -32,8 +33,8 @@
     "eve": "^0.80.1",
     "lucide-react": "^1.16.0",
     "motion": "^12.40.0",
-    "nanoid": "^5.1.11",
-    "next": "^16.3.6",
+    "nanoid": "^5.1.16",
+    "next": "^16.4.3",
     "radix-ui": "^1.4.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -42,14 +43,15 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0",
     "use-stick-to-bottom": "^1.1.4",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "just-bash": "^3.6.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.12"
   },
   "engines": {
     "node": "24.x"
@@ -61,5 +63,10 @@
   ],
   "allowScripts": {
     "electron@44.9.0": true
+  },
+  "overrides": {
+    "zod": "$zod",
+    "undici@^7.0.0": "^7.30.1",
+    "undici@^8.0.0": "^8.12.2"
   }
 }

@@ -26,8 +26,8 @@
     "@vercel/blob": "^2.8.2",
     "@vercel/connect": "2.5.2",
     "drizzle-orm": "^0.45.4",
-    "nanoid": "^5.1.11",
-    "zod": "^4.5.4"
+    "nanoid": "^5.1.16",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.11"

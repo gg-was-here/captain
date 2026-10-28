@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@libsql/client"],
   // Built-app previews at /a/<id>/ need the trailing slash so relative asset URLs resolve.
   skipTrailingSlashRedirect: true,
+  poweredByHeader: false,
 };
 
 // Mounts every bot under agents/ at /eve/<name>/v1/*.

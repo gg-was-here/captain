@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The desktop typecheck doesn't need the Electron binary.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Runs before typecheck: it generates the route types that apps/web/next-env.d.ts imports.
+      - name: Build web app
+        run: npm run build
+        env:
+          # Placeholder (encodes "ci.clerk.accounts.dev") so pages using Clerk hooks can prerender.
+          # Nothing calls Clerk at build time.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2kuY2xlcmsuYWNjb3VudHMuZGV2JA
+      - run: npm run typecheck
+      - name: Build Mac app (TypeScript)
+        run: npm run build -w @captain/desktop
+      - run: npm test
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
