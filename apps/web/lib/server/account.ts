@@ -55,6 +55,7 @@ export async function deleteAccountData(userId: string, origin: string, cookie?:
     db.delete(schema.usage).where(eq(schema.usage.userId, userId)),
     db.delete(schema.userSettings).where(eq(schema.userSettings.userId, userId)),
     db.delete(schema.sessionOwners).where(eq(schema.sessionOwners.userId, userId)),
+    db.delete(schema.sentActions).where(eq(schema.sentActions.userId, userId)),
   ]);
 
   // Bundles last: listing by prefix finds them even after an earlier attempt removed the rows.

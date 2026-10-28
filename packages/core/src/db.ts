@@ -51,6 +51,9 @@ async function migrate(client: ReturnType<typeof createClient>) {
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS session_owners (
         session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, agent TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS sent_actions (
+        user_id TEXT NOT NULL, call_id TEXT NOT NULL, tool TEXT NOT NULL, status TEXT NOT NULL, result TEXT,
+        created_at INTEGER NOT NULL, PRIMARY KEY (user_id, call_id))`,
       // The earliest thread that references a session owns it.
       ...(ownersTable.rows.length === 0
         ? [

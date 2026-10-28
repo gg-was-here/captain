@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchEmail } from "./gmail";
 import { UpstreamError } from "./http";
-import { listChannels, searchMessages } from "./slack";
+import { listChannels, postMessage, searchMessages } from "./slack";
 
 const json = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { ...init, headers: { "content-type": "application/json", ...init.headers } });
@@ -26,6 +26,32 @@ describe("connector HTTP", () => {
     const error = await searchMessages("token", { query: "hi" }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UpstreamError);
     expect((error as UpstreamError).status).toBe(503);
+  });
+
+  it("doesn't repeat a send after a server error, since it may have gone through", async () => {
+    const fetch = vi.fn(async () => new Response("oops", { status: 500, headers: { "retry-after": "0" } }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(postMessage("token", { channel: "C1", text: "hi" })).rejects.toBeInstanceOf(UpstreamError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't repeat a send after a dropped connection", async () => {
+    const fetch = vi.fn(async () => {
+      throw new TypeError("terminated");
+    });
+    vi.stubGlobal("fetch", fetch);
+    await expect(postMessage("token", { channel: "C1", text: "hi" })).rejects.toBeInstanceOf(UpstreamError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a rate-limited send, because nothing was sent", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("slow down", { status: 429, headers: { "retry-after": "0" } }))
+      .mockResolvedValueOnce(json({ ok: true, ts: "1.2", channel: "C1" }));
+    vi.stubGlobal("fetch", fetch);
+    await postMessage("token", { channel: "C1", text: "hi" });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("doesn't choke on Slack's HTML error pages", async () => {

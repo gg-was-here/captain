@@ -89,6 +89,25 @@ export const sessionOwners = sqliteTable("session_owners", {
   createdAt: timestamps.createdAt,
 });
 
+/**
+ * Emails and Slack posts by tool call, so a call eve runs again after an interruption doesn't send twice
+ * (see `sendOnce` in `sent-actions.ts`). Rows are kept for a week.
+ */
+export const sentActions = sqliteTable(
+  "sent_actions",
+  {
+    userId: text("user_id").notNull(),
+    callId: text("call_id").notNull(),
+    tool: text("tool").notNull(),
+    /** `pending` while sending (or when it's unknown whether the send went out), then `done`. */
+    status: text("status", { enum: ["pending", "done"] }).notNull(),
+    /** The send's result as JSON, once done. */
+    result: text("result"),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.callId] })],
+);
+
 /** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
 export const userSettings = sqliteTable("user_settings", {
   userId: text("user_id").primaryKey(),

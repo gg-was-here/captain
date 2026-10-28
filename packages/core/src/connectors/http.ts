@@ -30,23 +30,26 @@ const MAX_WAIT_S = 5;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * fetch that gives up after 15 s, and retries rate limits, server errors and dropped connections twice,
- * waiting as long as the service's Retry-After asks (up to 5 s). The last response is returned as is.
+ * fetch that gives up after 15 s and retries twice, waiting as long as the service's Retry-After asks (up
+ * to 5 s). Rate limits (429) are retried for any request, because nothing was done. Server errors and
+ * dropped connections are retried only for reads: a send that failed that way may still have gone
+ * through, and repeating it could post or email twice. The last response is returned as is.
  */
 export async function fetchApi(service: string, url: string, init: RequestInit = {}): Promise<Response> {
+  const read = !init.method || ["GET", "HEAD"].includes(init.method.toUpperCase());
   for (let attempt = 0; ; attempt++) {
     let response: Response;
     try {
       response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch (error) {
       const timedOut = error instanceof DOMException && error.name === "TimeoutError";
-      if (!timedOut && attempt < RETRIES) {
+      if (!timedOut && read && attempt < RETRIES) {
         await sleep(500 * 2 ** attempt);
         continue;
       }
       throw new UpstreamError(service, timedOut ? 504 : 503, timedOut ? `${service} didn't answer in time.` : `Couldn't reach ${service}.`);
     }
-    if ((response.status === 429 || response.status >= 500) && attempt < RETRIES) {
+    if ((response.status === 429 || (read && response.status >= 500)) && attempt < RETRIES) {
       const retryAfter = Number(response.headers.get("retry-after"));
       await response.body?.cancel();
       await sleep(Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2 ** attempt, MAX_WAIT_S) * 1000);
