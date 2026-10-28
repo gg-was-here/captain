@@ -47,17 +47,36 @@ export async function resolveUser(request: Request): Promise<CaptainUser | null>
   }
 }
 
-/** eve channel auth: maps the Captain user to a user principal so per-user connectors work. */
+/** The time zone the web app sends with each bot request (`x-captain-time-zone`), if it's a real one. */
+export function requestTimeZone(request: Request): string | undefined {
+  const zone = request.headers.get("x-captain-time-zone");
+  if (!zone || zone.length > 64) return undefined;
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * eve channel auth: maps the Captain user to a user principal so per-user connectors work. The user's
+ * time zone rides along as an attribute for the bots' "today" instruction.
+ */
 export function captainAuth(): AuthFn<Request> {
   return async (request) => {
     const user = await resolveUser(request);
     if (!user) return null;
+    const timeZone = requestTimeZone(request);
     return {
       authenticator: "captain",
       issuer: clerkConfigured() ? "clerk" : "local",
       principalId: user.id,
       principalType: "user",
-      attributes: { ...(user.email ? { email: user.email } : {}), ...(user.name ? { name: user.name } : {}) },
+      attributes: {
+        ...(user.email ? { email: user.email } : {}),
+        ...(user.name ? { name: user.name } : {}),
+        ...(timeZone ? { timeZone } : {}),
+      },
     };
   };
 }

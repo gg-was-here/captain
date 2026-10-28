@@ -34,7 +34,9 @@ await tasks.put({ id: t.id, status: "done" });                 // update (merge)
 await tasks.remove(t.id);
 
 // Connectors — run as the signed-in user, through Bambii. Only those declared in create_app are allowed.
-const { messages } = await slack.searchMessages({ query: "to:me after:2026-10-01", count: 50 });
+// Work out dates when the app runs; never hard-code one.
+const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const { messages } = await slack.searchMessages({ query: `to:me after:${weekAgo}`, count: 50 });
 const channels = await slack.listChannels();
 const emails = await gmail.searchEmail({ query: "is:unread newer_than:7d" });
 const thread = await gmail.readThread({ threadId });
