@@ -56,7 +56,7 @@ export async function searchEmail(
     (list.messages ?? []).map(async ({ id, threadId }) => {
       const msg = await gmail<{ snippet: string; labelIds?: string[]; payload: GmailPayload }>(
         token,
-        `/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        `/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
       );
       return {
         id,
@@ -74,7 +74,7 @@ export async function searchEmail(
 export async function readThread(token: string, { threadId }: { threadId: string }) {
   const thread = await gmail<{ messages: { id: string; payload: GmailPayload }[] }>(
     token,
-    `/threads/${threadId}?format=full`,
+    `/threads/${encodeURIComponent(threadId)}?format=full`,
   );
   return thread.messages.map((m) => ({
     id: m.id,
@@ -86,31 +86,70 @@ export async function readThread(token: string, { threadId }: { threadId: string
   }));
 }
 
-function rawMessage({ to, subject, body, threadId: _ }: { to: string; subject: string; body: string; threadId?: string }) {
-  const mime = [`To: ${to}`, `Subject: ${subject}`, "Content-Type: text/plain; charset=utf-8", "", body].join(
-    "\r\n",
-  );
-  return Buffer.from(mime).toString("base64url");
+/** Header text as RFC 2047 when it isn't plain ASCII, so a subject like "Café ☕" arrives intact. */
+function encodeHeader(value: string) {
+  return /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
 }
 
-export async function createDraft(
-  token: string,
-  input: { to: string; subject: string; body: string; threadId?: string },
-) {
+/** A line break in a header would start a new header (a hidden Bcc, say) or the body. */
+function headerValue(name: string, value: string) {
+  if (/[\r\n\0]/.test(value)) throw new Error(`The email's ${name} can't contain line breaks`);
+  return value;
+}
+
+interface Email {
+  to: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+}
+
+/**
+ * Gmail threads a reply only when it carries In-Reply-To and References for the message it answers and
+ * a matching subject, so look those up from the thread's latest message.
+ */
+async function replyHeaders(token: string, threadId: string) {
+  const thread = await gmail<{ messages?: { payload: GmailPayload }[] }>(
+    token,
+    `/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=Subject`,
+  );
+  const last = thread.messages?.at(-1)?.payload;
+  const messageId = last && header(last, "Message-ID");
+  if (!last || !messageId) return {};
+  // These come from a received email, so they get no say in the message's structure either.
+  const clean = (value: string) => value.replace(/[\r\n\0]/g, " ");
+  const references = [header(last, "References"), messageId].filter(Boolean).join(" ");
+  return { inReplyTo: clean(messageId), references: clean(references) };
+}
+
+async function rawMessage(token: string, { to, subject, body, threadId }: Email) {
+  const reply = threadId ? await replyHeaders(token, threadId) : {};
+  const replySubject = threadId && !/^re:/i.test(subject.trim()) ? `Re: ${subject}` : subject;
+  const lines = [
+    `To: ${headerValue("recipients", to)}`,
+    `Subject: ${encodeHeader(headerValue("subject", replySubject))}`,
+    ...(reply.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.references}`] : []),
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    ...(Buffer.from(body, "utf8").toString("base64").match(/.{1,76}/g) ?? []),
+  ];
+  return Buffer.from(lines.join("\r\n")).toString("base64url");
+}
+
+export async function createDraft(token: string, input: Email) {
   const draft = await gmail<{ id: string }>(token, "/drafts", {
     method: "POST",
-    body: JSON.stringify({ message: { raw: rawMessage(input), threadId: input.threadId } }),
+    body: JSON.stringify({ message: { raw: await rawMessage(token, input), threadId: input.threadId } }),
   });
   return { draftId: draft.id };
 }
 
-export async function sendEmail(
-  token: string,
-  input: { to: string; subject: string; body: string; threadId?: string },
-) {
+export async function sendEmail(token: string, input: Email) {
   const sent = await gmail<{ id: string; threadId: string }>(token, "/messages/send", {
     method: "POST",
-    body: JSON.stringify({ raw: rawMessage(input), threadId: input.threadId }),
+    body: JSON.stringify({ raw: await rawMessage(token, input), threadId: input.threadId }),
   });
   return { messageId: sent.id, threadId: sent.threadId };
 }

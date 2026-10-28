@@ -30,7 +30,7 @@ export const POST = route(async (request: Request) => {
   const actions = APP_ACTIONS[connector as AppActionConnector] as
     | Record<string, { write: boolean; input: z.ZodType; run: (token: string, input: never) => Promise<unknown> }>
     | undefined;
-  const spec = actions?.[action];
+  const spec = actions && Object.hasOwn(actions, action) ? actions[action] : undefined;
   if (!spec) throw new HttpError(400, `Unknown action ${connector}.${action}`);
   const parsed = spec.input.parse(input);
 

@@ -1,8 +1,9 @@
-import { z } from "zod";
 import * as gmail from "./gmail";
+import { inputs } from "./inputs";
 import * as slack from "./slack";
 
 export { gmail, slack };
+export { inputs } from "./inputs";
 export { ConnectorAuthError } from "./slack";
 
 /**
@@ -42,45 +43,17 @@ export const CONNECTOR_NAMES = Object.keys(CONNECTORS) as ConnectorName[];
  */
 export const APP_ACTIONS = {
   slack: {
-    searchMessages: {
-      write: false,
-      input: z.object({ query: z.string(), count: z.number().int().max(100).optional() }),
-      run: slack.searchMessages,
-    },
-    listChannels: { write: false, input: z.object({}), run: slack.listChannels },
-    channelHistory: {
-      write: false,
-      input: z.object({ channel: z.string(), limit: z.number().int().max(200).optional(), oldest: z.string().optional() }),
-      run: slack.channelHistory,
-    },
-    threadReplies: {
-      write: false,
-      input: z.object({ channel: z.string(), ts: z.string() }),
-      run: slack.threadReplies,
-    },
-    postMessage: {
-      write: true,
-      input: z.object({ channel: z.string(), text: z.string(), threadTs: z.string().optional() }),
-      run: slack.postMessage,
-    },
+    searchMessages: { write: false, input: inputs.slackSearch, run: slack.searchMessages },
+    listChannels: { write: false, input: inputs.slackListChannels, run: slack.listChannels },
+    channelHistory: { write: false, input: inputs.slackChannelHistory, run: slack.channelHistory },
+    threadReplies: { write: false, input: inputs.slackThread, run: slack.threadReplies },
+    postMessage: { write: true, input: inputs.slackPost, run: slack.postMessage },
   },
   google: {
-    searchEmail: {
-      write: false,
-      input: z.object({ query: z.string(), maxResults: z.number().int().max(50).optional() }),
-      run: gmail.searchEmail,
-    },
-    readThread: { write: false, input: z.object({ threadId: z.string() }), run: gmail.readThread },
-    createDraft: {
-      write: true,
-      input: z.object({ to: z.string(), subject: z.string(), body: z.string(), threadId: z.string().optional() }),
-      run: gmail.createDraft,
-    },
-    sendEmail: {
-      write: true,
-      input: z.object({ to: z.string(), subject: z.string(), body: z.string(), threadId: z.string().optional() }),
-      run: gmail.sendEmail,
-    },
+    searchEmail: { write: false, input: inputs.gmailSearch, run: gmail.searchEmail },
+    readThread: { write: false, input: inputs.gmailReadThread, run: gmail.readThread },
+    createDraft: { write: true, input: inputs.email, run: gmail.createDraft },
+    sendEmail: { write: true, input: inputs.email, run: gmail.sendEmail },
   },
 } as const;
 
