@@ -1,5 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
-import { mayUseSession } from "@captain/core/session-owners";
+import { mayUseSession, SESSION_ID } from "@captain/core/session-owners";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getThread } from "@/lib/server/data";
@@ -18,7 +18,7 @@ const updateThread = z.object({
   title: z.string().min(1).max(120).optional(),
   preview: z.string().max(200).optional(),
   instructions: z.string().max(4000).optional(),
-  sessionId: z.string().max(128).optional(),
+  sessionId: z.string().regex(SESSION_ID).optional(),
   appId: z.string().max(64).nullable().optional(),
 });
 

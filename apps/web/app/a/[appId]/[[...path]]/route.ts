@@ -74,13 +74,14 @@ export async function GET(
       // No remote images: an image URL can carry the app's data to any server.
       `img-src ${origin} data: blob:`,
       `font-src ${origin} data:`,
+      `media-src ${origin} data: blob:`,
       "connect-src 'none'",
       "form-action 'none'",
       "base-uri 'none'",
       "object-src 'none'",
       "frame-src 'none'",
       `frame-ancestors ${origin}`,
-      "sandbox allow-scripts allow-forms allow-modals allow-popups",
+      "sandbox allow-scripts allow-forms allow-modals",
     ].join("; "),
     // Vite emits `<script type="module" crossorigin>`, fetched in CORS mode from the sandbox's opaque origin.
     "access-control-allow-origin": "null",

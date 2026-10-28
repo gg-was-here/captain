@@ -42,19 +42,14 @@ describe("Gmail messages", () => {
     expect(bodyOf(sent[0])).toBe("Line one\nLigne deux — ✓");
   });
 
-  it("threads replies to the thread's latest message", async () => {
+  it("threads replies to the latest message the recipients received", async () => {
+    const message = (id: string, extra: object = {}) => ({
+      payload: { mimeType: "text/plain", headers: [{ name: "Message-ID", value: id }, { name: "References", value: "<m1@mail.gmail.com>" }] },
+      ...extra,
+    });
     const sent = mockGmail({
-      messages: [
-        {
-          payload: {
-            mimeType: "text/plain",
-            headers: [
-              { name: "Message-ID", value: "<m2@mail.gmail.com>" },
-              { name: "References", value: "<m1@mail.gmail.com>" },
-            ],
-          },
-        },
-      ],
+      // The bots usually save a draft first; a reply must point at the real message before it.
+      messages: [message("<m2@mail.gmail.com>"), message("<draft@mail.gmail.com>", { labelIds: ["DRAFT"] })],
     });
     await createDraft("token", { to: "a@b.com", subject: "Plans", body: "Sounds good", threadId: "18c2f" });
     const headers = headersOf(sent[0]);
@@ -66,6 +61,8 @@ describe("Gmail messages", () => {
   it("validates recipients and ids", () => {
     const email = (to: string) => inputs.email.safeParse({ to, subject: "Hi", body: "" }).success;
     expect(email("Ada Lovelace <ada@example.com>, bob@example.com")).toBe(true);
+    expect(email('"Doe, John" <john@corp.com>, ada@example.com')).toBe(true);
+    expect(email("a@example.com; b@example.com")).toBe(false);
     expect(email("not an address")).toBe(false);
     expect(email("")).toBe(false);
     expect(inputs.gmailReadThread.safeParse({ threadId: "../settings/filters" }).success).toBe(false);

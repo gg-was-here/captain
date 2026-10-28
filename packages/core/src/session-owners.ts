@@ -10,6 +10,9 @@ export async function recordSessionOwner(sessionId: string, userId: string, agen
   await db.insert(schema.sessionOwners).values({ sessionId, userId, agent }).onConflictDoNothing();
 }
 
+/** eve session ids look like `wrun_01M6…`; anything else is refused before it reaches the database. */
+export const SESSION_ID = /^[A-Za-z0-9_-]{8,80}$/;
+
 async function ownerOf(sessionId: string): Promise<string | undefined> {
   const db = await getDb();
   const [owner] = await db
@@ -26,6 +29,7 @@ async function ownerOf(sessionId: string): Promise<string | undefined> {
  * an owner that is already recorded.
  */
 export async function mayUseSession(userId: string, sessionId: string, agent = "unknown"): Promise<boolean> {
+  if (!SESSION_ID.test(sessionId)) return false;
   const owner = await ownerOf(sessionId);
   if (owner !== undefined) return owner === userId;
   await recordSessionOwner(sessionId, userId, agent);

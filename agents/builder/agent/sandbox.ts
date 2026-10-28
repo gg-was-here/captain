@@ -24,13 +24,21 @@ export const environment = VercelSandbox.environment({
 
 /**
  * Builder reads the user's Slack and Gmail and runs shell commands, so a prompt injected through that
- * data could try to send it out with curl. The sandbox can reach only the npm registry, and stops
- * after 15 minutes of compute (it resumes on the next command).
+ * data could try to send it out. The sandbox can only download from the npm registry: anything that
+ * writes to it (publish, login) gets an invalid token at the firewall, whatever token the sandbox sends.
  */
+export const NETWORK_POLICY = {
+  allow: {
+    "registry.npmjs.org": [
+      {
+        match: { method: ["PUT", "POST", "PATCH", "DELETE"] },
+        transform: [{ headers: { authorization: "Bearer blocked-by-bambii" } }],
+      },
+    ],
+  },
+};
+
+/** The sandbox stops after 15 minutes of compute and resumes on the next command. */
 export default defineSandbox(() =>
-  environment.open({
-    resources: { vcpus: 2 },
-    timeout: 15 * 60 * 1000,
-    networkPolicy: { allow: { "registry.npmjs.org": [] } },
-  }),
+  environment.open({ resources: { vcpus: 2 }, timeout: 15 * 60 * 1000, networkPolicy: NETWORK_POLICY }),
 );

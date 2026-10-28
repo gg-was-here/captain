@@ -6,11 +6,18 @@ import { listWebRecords, onAppDataChanged, putWebRecord, removeWebRecord } from 
  * side owns its data, makes the API calls, and asks the user before any write action.
  *
  * Only the document Bambii loaded into the frame may use the bridge. It gets a private MessagePort in
- * answer to its first "hello". If the frame then loads anything else (a link, a form, app code changing
- * `location`), that document can't reach the port; the port is closed and the app reloaded, and the
- * reloaded app gets a new port once it has finished loading.
+ * answer to its first "hello". If the frame then loads another document (the app reloading or moving
+ * within its own files: Bambii's pages don't let frames load other sites), the port is closed and
+ * `onLeft` asks for a fresh frame, so nothing from the old browsing context can reach the new bridge.
+ *
+ * The frame can't open windows. A link the user clicks in the app reaches `onOpenLink`, and Bambii
+ * shows the address with its own Open button.
  */
-export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name: string }) {
+export function serveAppBridge(
+  frame: HTMLIFrameElement,
+  app: { id: string; name: string },
+  { onLeft, onOpenLink }: { onLeft: () => void; onOpenLink: (url: string) => void },
+) {
   const runtime = async (kind: "ai" | "connectors", body: Record<string, unknown>, confirmed = false): Promise<any> => {
     const response = await fetch(`/api/runtime/${kind}`, {
       method: "POST",
@@ -20,7 +27,7 @@ export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name
     });
     const json = await response.json().catch(() => ({ error: response.statusText }));
     if (response.status === 409 && json.needsConfirmation) {
-      if (!window.confirm(`${json.summary}\n\n${JSON.stringify(json.details, null, 2).slice(0, 1500)}`)) {
+      if (!window.confirm(`${json.summary}\n\n${json.text ?? JSON.stringify(json.details, null, 2)}`)) {
         throw new Error("Cancelled by user");
       }
       return runtime(kind, body, true);
@@ -36,12 +43,20 @@ export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name
     "ai.generate": ({ prompt, system, json }: Record<string, unknown> = {}) => runtime("ai", { prompt, system, json }),
     "connectors.call": async (connector: string, action: string, input: Record<string, unknown>) =>
       (await runtime("connectors", { connector, action, input })).result,
+    open: (url: unknown) => {
+      let target: URL | undefined;
+      try {
+        target = new URL(String(url));
+      } catch {}
+      if (!target || !["https:", "http:", "mailto:"].includes(target.protocol)) throw new Error("Only web and email links can be opened");
+      onOpenLink(target.href);
+    },
   };
 
   let port: MessagePort | undefined;
-  // "waiting": the next hello from the frame gets a port. "connected": a port is out; a hello or a load
-  // means another document. "reloading": the app is being reloaded; hellos wait for its load to finish.
-  let state: "waiting" | "connected" | "reloading" = "waiting";
+  // "waiting": the first hello from the frame gets the port. "connected": the port is out; later hellos
+  // (repeats, or another document) get nothing. "left": the frame loaded another document.
+  let state: "waiting" | "connected" | "left" = "waiting";
   let loads = 0;
 
   const serve = async (event: MessageEvent) => {
@@ -57,18 +72,8 @@ export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name
     }
   };
 
-  const reload = () => {
-    port?.close();
-    port = undefined;
-    state = "reloading";
-    loads = 0;
-    frame.src = frame.src;
-  };
-
   const onMessage = (event: MessageEvent) => {
-    if (event.source !== frame.contentWindow || event.data?.captain !== "hello") return;
-    if (state === "connected") return reload();
-    if (state !== "waiting") return;
+    if (state !== "waiting" || event.source !== frame.contentWindow || event.data?.captain !== "hello") return;
     const channel = new MessageChannel();
     port = channel.port1;
     port.onmessage = (message) => void serve(message);
@@ -76,11 +81,13 @@ export function serveAppBridge(frame: HTMLIFrameElement, app: { id: string; name
     state = "connected";
   };
 
-  // The first load is the document Bambii put in the frame; any later one is a navigation.
+  // The first load is the document Bambii put in the frame; any later one is another document.
   const onLoad = () => {
-    loads++;
-    if (state === "reloading") state = "waiting";
-    else if (loads > 1) reload();
+    if (++loads === 1 || state === "left") return;
+    state = "left";
+    port?.close();
+    port = undefined;
+    onLeft();
   };
 
   window.addEventListener("message", onMessage);

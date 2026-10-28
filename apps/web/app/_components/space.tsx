@@ -2,6 +2,7 @@
 
 import type { App } from "@captain/core/schema";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { serveAppBridge } from "@/lib/client/app-bridge";
 import { useDesktop } from "@/lib/client/desktop";
 
@@ -23,6 +24,9 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string>();
+  // Bumped when the web preview's frame leaves the app, so it is replaced with a fresh one.
+  const [frameKey, setFrameKey] = useState(0);
+  const [link, setLink] = useState<string>();
 
   useEffect(() => {
     if (!desktop || !hostRef.current) return;
@@ -58,8 +62,11 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
 
   useEffect(() => {
     if (desktop !== null || !frameRef.current) return;
-    return serveAppBridge(frameRef.current, app);
-  }, [desktop, app.id, app.name, app.currentVersion, reloadKey]);
+    return serveAppBridge(frameRef.current, app, {
+      onLeft: () => setFrameKey((key) => key + 1),
+      onOpenLink: setLink,
+    });
+  }, [desktop, app.id, app.name, app.currentVersion, reloadKey, frameKey]);
 
   return (
     <div className="relative size-full" ref={hostRef}>
@@ -68,17 +75,40 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
           <Placeholder>{state === "loading" ? `Installing ${app.name} on this Mac…` : `Couldn't open the app: ${error}`}</Placeholder>
         )
       ) : app.currentVersion > 0 ? (
-        <iframe
-          className="absolute inset-0 size-full bg-white"
-          key={reloadKey}
-          ref={frameRef}
-          sandbox="allow-scripts allow-forms allow-modals allow-popups"
-          src={`/a/${app.id}/?v=${app.currentVersion}`}
-          title={app.name}
-        />
+        <>
+          <iframe
+            className="absolute inset-0 size-full bg-white"
+            key={`${reloadKey}:${frameKey}`}
+            ref={frameRef}
+            sandbox="allow-scripts allow-forms allow-modals"
+            src={`/a/${app.id}/?v=${app.currentVersion}`}
+            title={app.name}
+          />
+          {link ? <OpenLink app={app.name} link={link} onDone={() => setLink(undefined)} /> : null}
+        </>
       ) : (
         <Placeholder>Builder is still working on this app…</Placeholder>
       )}
+    </div>
+  );
+}
+
+/** A link the app wants opened, shown in full; the user's own click on Open opens it in a new tab. */
+function OpenLink({ app, link, onDone }: { readonly app: string; readonly link: string; readonly onDone: () => void }) {
+  return (
+    <div className="absolute inset-x-3 bottom-3 z-10 rounded-xl border bg-background p-3 text-sm shadow-lg">
+      <p className="font-medium">{app} wants to open a link</p>
+      <p className="mt-1 max-h-24 overflow-y-auto break-all text-muted-foreground text-xs">{link}</p>
+      <div className="mt-3 flex justify-end gap-2">
+        <Button onClick={onDone} size="sm" variant="outline">
+          Cancel
+        </Button>
+        <Button asChild size="sm">
+          <a href={link} onClick={onDone} rel="noopener noreferrer" target="_blank">
+            Open
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }

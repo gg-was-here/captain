@@ -310,7 +310,8 @@ export function SafeImage({ src, alt, node: _node, ...props }: ComponentProps<"i
   );
 }
 
-const streamdownComponents = { img: SafeImage };
+// <picture><source srcset> would load its own image next to the <img>, so sources are dropped.
+const streamdownComponents = { img: SafeImage, source: () => null };
 
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (

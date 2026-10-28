@@ -42,7 +42,8 @@ describe("built-app preview", () => {
     const response = await get(`t/${token}/`, "iframe");
     expect(response.status).toBe(200);
     const csp = response.headers.get("content-security-policy") ?? "";
-    expect(csp).toContain("sandbox allow-scripts allow-forms allow-modals allow-popups");
+    expect(csp).toMatch(/sandbox allow-scripts allow-forms allow-modals(;|$)/);
+    expect(csp).not.toMatch(/allow-popups/);
     expect(csp).not.toMatch(/allow-same-origin/);
     expect(csp).toMatch(/img-src [^;]*data: blob:(;|$)/);
     expect(csp).not.toMatch(/img-src [^;]*\shttps:(\s|;|$)/);

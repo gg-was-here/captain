@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isCrossSiteWrite, sessionIdOf, trustedForwarders } from "./channel";
+import { isCrossSiteWrite, routePath, sessionIdOf, trustedForwarders } from "./channel";
 
 type Forwarder = Parameters<typeof trustedForwarders>[0];
 type Assertion = Parameters<typeof trustedForwarders>[1];
@@ -13,6 +13,16 @@ const user = (issuer: string) => ({
 });
 const assertion = (issuer: string) => ({ principal: { current: user(issuer), initiator: user(issuer) } }) as unknown as Assertion;
 const forwarder = (fields: Record<string, string>) => fields as unknown as Forwarder;
+
+describe("routePath", () => {
+  it("ignores trailing and repeated slashes, as eve's router does", () => {
+    const path = (p: string) => routePath(new Request(`https://bambii.ai${p}`));
+    expect(path("/eve/captain/v1/session/")).toBe("/eve/captain/v1/session");
+    expect(path("/eve/captain/v1/info//")).toBe("/eve/captain/v1/info");
+    expect(path("/eve//captain/v1//session/wrun_1/")).toBe("/eve/captain/v1/session/wrun_1");
+    expect(path("/")).toBe("/");
+  });
+});
 
 describe("sessionIdOf", () => {
   it("finds the session in every session route", () => {
@@ -75,5 +85,9 @@ describe("isCrossSiteWrite", () => {
 
   it("leaves bearer callers alone", () => {
     expect(isCrossSiteWrite(post({ authorization: "Bearer x", "content-type": "text/plain" }))).toBe(false);
+  });
+
+  it("still checks cookie requests that carry another kind of Authorization header", () => {
+    expect(isCrossSiteWrite(post({ authorization: "Basic eA==", "sec-fetch-site": "cross-site" }))).toBe(true);
   });
 });

@@ -24,17 +24,22 @@ export function isExternalUrl(url: string): boolean {
 }
 
 /**
- * Pages the main window may show. It has no address bar, so only Bambii and the sign-in pages Clerk serves
- * from Bambii's own subdomains (clerk.bambii.ai, accounts.bambii.ai) or Clerk's development domains.
- * Anything else opens in the browser, where the user can see the address.
+ * Pages the main window may show. It has no address bar, so only Bambii itself and Clerk's sign-in API:
+ * clerk.<bambii's host> and accounts.<bambii's host> for a production Clerk instance, and
+ * <instance>.clerk.accounts.dev for a development one. Anything else opens in the browser, where the user
+ * can see the address (Clerk's hosted pages for any development instance, <name>.accounts.dev, included).
  */
 export function mayShowInWindow(url: string, origin: string): boolean {
   try {
     const target = new URL(url);
     if (target.origin === origin) return true;
     if (target.protocol !== "https:") return false;
-    const site = new URL(origin).hostname.split(".").slice(-2).join(".");
-    return target.hostname.endsWith(`.${site}`) || target.hostname.endsWith(".accounts.dev");
+    const host = new URL(origin).hostname;
+    return (
+      target.hostname === `clerk.${host}` ||
+      target.hostname === `accounts.${host}` ||
+      target.hostname.endsWith(".clerk.accounts.dev")
+    );
   } catch {
     return false;
   }

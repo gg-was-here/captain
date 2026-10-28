@@ -34,6 +34,7 @@ const CSP = [
   // No remote images: an image URL can carry the app's data to any server.
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
+  "media-src 'self' data: blob:",
   "connect-src 'none'",
   "form-action 'none'",
   "base-uri 'none'",
@@ -51,12 +52,13 @@ const MIME: Record<string, string> = {
   woff2: "font/woff2",
 };
 
-const partitionsWithProtocol = new Set<string>();
+/** Each app partition, set up once; `ready` settles when its traffic goes to the dead proxy. */
+const partitions = new Map<string, Promise<void>>();
 
-function appSession(appId: string) {
+async function appSession(appId: string) {
   const partition = `persist:app-${appId}`;
   const ses = session.fromPartition(partition);
-  if (!partitionsWithProtocol.has(partition)) {
+  if (!partitions.has(partition)) {
     ses.protocol.handle(APP_SCHEME, async (request) => {
       const url = new URL(request.url);
       if (url.hostname !== appId.toLowerCase()) return new Response("Forbidden", { status: 403 });
@@ -82,9 +84,9 @@ function appSession(appId: string) {
     ses.setPermissionCheckHandler((_wc, permission) => permission === "clipboard-sanitized-write");
     // CSP can't stop WebRTC. Route the session's traffic, loopback included, to a proxy that doesn't exist;
     // app views also limit WebRTC to that proxy (see `open`).
-    void ses.setProxy({ proxyRules: "http://127.0.0.1:9", proxyBypassRules: "<-loopback>" });
-    partitionsWithProtocol.add(partition);
+    partitions.set(partition, ses.setProxy({ proxyRules: "http://127.0.0.1:9", proxyBypassRules: "<-loopback>" }));
   }
+  await partitions.get(partition);
   return ses;
 }
 
@@ -121,6 +123,7 @@ export class SpaceManager {
     const manifest = await store.readManifest(appId);
     if (!manifest) throw new Error("App manifest missing");
     await this.ensurePermissions(manifest);
+    const appSessionReady = await appSession(appId);
     if (generation !== this.generation) return;
 
     this.close();
@@ -128,7 +131,7 @@ export class SpaceManager {
     const view = new WebContentsView({
       webPreferences: {
         preload: join(__dirname, "..", "preload", "space.js"),
-        session: appSession(appId),
+        session: appSessionReady,
         sandbox: true,
         contextIsolation: true,
         additionalArguments: [`--captain-app=${JSON.stringify({ id: appId, name: manifest.name, version })}`],
@@ -167,8 +170,8 @@ export class SpaceManager {
   close() {
     this.generation++;
     if (!this.view) return;
-    this.window.contentView.removeChildView(this.view);
-    this.view.webContents.close();
+    if (!this.window.isDestroyed()) this.window.contentView.removeChildView(this.view);
+    if (!this.view.webContents.isDestroyed()) this.view.webContents.close();
     this.view = undefined;
     this.appId = undefined;
   }
@@ -237,7 +240,7 @@ export class SpaceManager {
         defaultId: 1,
         cancelId: 1,
         message: json.summary,
-        detail: JSON.stringify(json.details, null, 2).slice(0, 1500),
+        detail: json.text ?? JSON.stringify(json.details, null, 2),
       });
       if (choice !== 0) throw new Error("Cancelled by user");
       return this.runtimeCall(kind, body, true);

@@ -5,7 +5,8 @@
  * confirmations. Mirrors the desktop Space's preload bridge.
  *
  * Calls travel over a private MessagePort that the Bambii page hands to this document in answer to its
- * "hello", so a page the frame navigates to later can't use the bridge.
+ * "hello", so a page the frame navigates to later can't use the bridge. The frame can't open windows:
+ * clicked links are passed to Bambii, which shows the address before opening it.
  */
 export const BRIDGE_SCRIPT = `(() => {
   const pending = new Map();
@@ -31,31 +32,41 @@ export const BRIDGE_SCRIPT = `(() => {
     }
   };
   // The app can start before the Bambii page is listening (the iframe is server-rendered), so keep
-  // saying hello until it answers with the port; calls queue until then.
+  // saying hello until it answers with the port, more slowly after the first seconds; calls queue until then.
   let hellos = 0;
+  let helloTimer;
   const sayHello = () => {
-    if (port || ++hellos > 100) return clearInterval(helloTimer);
+    if (port) return;
     parent.postMessage({ captain: "hello" }, "*");
+    helloTimer = setTimeout(sayHello, ++hellos < 50 ? 100 : 1000);
   };
-  const helloTimer = setInterval(sayHello, 100);
   addEventListener("message", (event) => {
     if (port || event.source !== parent || !event.data || event.data.captain !== "ready" || !event.ports[0]) return;
     port = event.ports[0];
     port.onmessage = onPortMessage;
-    clearInterval(helloTimer);
+    clearTimeout(helloTimer);
     for (const message of queue.splice(0)) port.postMessage(message);
   });
   sayHello();
-  // Links open in a new tab, so the app's own document stays in the frame. In-page links still scroll.
+  // Links leave through Bambii (the frame can't open windows or load other sites). In-page links still
+  // scroll; other links to the app's own files would only reload it.
   addEventListener(
     "click",
     (event) => {
-      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      const link = event
+        .composedPath()
+        .find((node) => node instanceof Element && node.matches("a[href], area[href], a[*|href]"));
       if (!link) return;
-      const target = new URL(link.href, location.href);
+      const href = link.getAttribute("href") ?? link.getAttributeNS("http://www.w3.org/1999/xlink", "href") ?? "";
+      let target;
+      try {
+        target = new URL(href, document.baseURI);
+      } catch {
+        return;
+      }
       if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) return;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+      event.preventDefault();
+      if (target.origin !== location.origin) call("open", target.href).catch(() => {});
     },
     true,
   );

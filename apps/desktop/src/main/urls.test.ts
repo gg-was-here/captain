@@ -37,13 +37,13 @@ describe("main window navigation", () => {
   const origin = "https://bambii.ai";
 
   it("shows Bambii and its Clerk sign-in pages", () => {
-    for (const url of ["https://bambii.ai/t/1", "https://clerk.bambii.ai/v1/client/handshake", "https://accounts.bambii.ai/sign-in", "https://happy-cat-1.clerk.accounts.dev/v1/client"]) {
+    for (const url of ["https://bambii.ai/t/1", "https://clerk.bambii.ai/v1/client/handshake", "https://accounts.bambii.ai/sign-in", "https://notable-bunny-7530.clerk.accounts.dev/v1/client"]) {
       expect(mayShowInWindow(url, origin)).toBe(true);
     }
   });
 
   it("sends other sites to the browser", () => {
-    for (const url of ["https://bambii-login.evil.com/", "https://evilbambii.ai/", "http://clerk.bambii.ai/", "file:///etc/passwd"]) {
+    for (const url of ["https://bambii-login.evil.com/", "https://evilbambii.ai/", "http://clerk.bambii.ai/", "https://bambii-login.accounts.dev/sign-in", "https://other.bambii.ai/", "file:///etc/passwd"]) {
       expect(mayShowInWindow(url, origin)).toBe(false);
     }
   });

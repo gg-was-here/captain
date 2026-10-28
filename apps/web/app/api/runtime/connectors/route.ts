@@ -1,4 +1,5 @@
 import { APP_ACTIONS, type AppActionConnector, ConnectorAuthError } from "@captain/core/connectors";
+import { emailPrompt, slackPostPrompt } from "@captain/core/tools/approval-prompts";
 import { z } from "zod";
 import { userToken } from "@/lib/server/connect";
 import { requireApp } from "@/lib/server/data";
@@ -32,13 +33,19 @@ export const POST = route(async (request: Request) => {
     | undefined;
   const spec = actions && Object.hasOwn(actions, action) ? actions[action] : undefined;
   if (!spec) throw new HttpError(400, `Unknown action ${connector}.${action}`);
-  const parsed = spec.input.parse(input);
+  const result = spec.input.safeParse(input);
+  if (!result.success) {
+    const problems = result.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`);
+    throw new HttpError(400, `Invalid input for ${connector}.${action}. ${problems.join("; ")}`);
+  }
+  const parsed = result.data as Record<string, unknown>;
 
   if (spec.write && request.headers.get("x-captain-confirmed") !== "1") {
     return Response.json(
       {
         needsConfirmation: true,
         summary: `${app.name} wants to ${action.replace(/([A-Z])/g, " $1").toLowerCase()} via ${connector}`,
+        text: confirmationText(connector, action, parsed),
         details: parsed,
       },
       { status: 409 },
@@ -56,3 +63,15 @@ export const POST = route(async (request: Request) => {
     throw error;
   }
 });
+
+/** Every field of a write action, laid out for the user to confirm; text past 4,000 characters is cut, visibly. */
+function confirmationText(connector: string, action: string, input: Record<string, unknown>) {
+  if (connector === "slack" && action === "postMessage") {
+    return slackPostPrompt(input as Parameters<typeof slackPostPrompt>[0], 4000);
+  }
+  if (connector === "google" && (action === "sendEmail" || action === "createDraft")) {
+    const question = action === "sendEmail" ? "Send this email from your Gmail?" : "Save this email as a draft in your Gmail?";
+    return emailPrompt(question, input as Parameters<typeof emailPrompt>[1], 4000);
+  }
+  return JSON.stringify(input, null, 2);
+}

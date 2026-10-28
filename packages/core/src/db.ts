@@ -19,6 +19,8 @@ function createDb() {
  * Keep in sync with `schema.ts`; production uses `drizzle-kit push`.
  */
 async function migrate(client: ReturnType<typeof createClient>) {
+  // Owners for sessions that predate them are filled in once, when their table is first created.
+  const ownersTable = await client.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_owners'");
   if (databaseUrl().startsWith("file:")) {
     // Local dev: the web server and every bot server share this file. WAL lets readers and a writer
     // overlap; the client's `timeout` waits for another process's write instead of failing with SQLITE_BUSY.
@@ -49,9 +51,13 @@ async function migrate(client: ReturnType<typeof createClient>) {
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS session_owners (
         session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, agent TEXT NOT NULL, created_at INTEGER NOT NULL)`,
-      // Owners for sessions started before they were recorded: the earliest thread that references a session wins.
-      `INSERT OR IGNORE INTO session_owners (session_id, user_id, agent, created_at)
-        SELECT session_id, user_id, 'unknown', created_at FROM threads WHERE session_id IS NOT NULL ORDER BY created_at`,
+      // The earliest thread that references a session owns it.
+      ...(ownersTable.rows.length === 0
+        ? [
+            `INSERT OR IGNORE INTO session_owners (session_id, user_id, agent, created_at)
+              SELECT session_id, user_id, 'unknown', created_at FROM threads WHERE session_id IS NOT NULL ORDER BY created_at`,
+          ]
+        : []),
     ],
     "write",
   );

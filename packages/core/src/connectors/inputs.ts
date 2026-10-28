@@ -12,13 +12,35 @@ const headerText = (max: number) =>
     .max(max)
     .regex(/^[^\r\n\0]*$/, "Can't contain line breaks");
 
-const address = (entry: string) => entry.match(/<([^<>]+)>$/)?.[1] ?? entry;
+/** Recipient entries, split on commas outside quoted names and angle brackets: `"Doe, Jane" <j@x.com>` is one. */
+export function recipientsOf(value: string): string[] {
+  const entries: string[] = [];
+  let current = "";
+  let quoted = false;
+  let bracketed = false;
+  for (const char of value) {
+    if (char === '"') quoted = !quoted;
+    else if (!quoted && char === "<") bracketed = true;
+    else if (!quoted && char === ">") bracketed = false;
+    else if (!quoted && !bracketed && char === ",") {
+      entries.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  entries.push(current.trim());
+  return entries.filter(Boolean);
+}
+
+/** The address a recipient entry sends to: `Name <a@b.com>` is `a@b.com`. */
+export const addressOf = (entry: string) => (entry.match(/<([^<>]*)>\s*$/)?.[1] ?? entry).trim();
 
 /** One or more recipients, comma-separated, each "a@b.com" or "Name <a@b.com>". */
 const recipients = headerText(2000).refine((value) => {
-  const entries = value.split(",").map((entry) => entry.trim()).filter(Boolean);
-  return entries.length > 0 && entries.length <= 20 && entries.every((entry) => z.email().safeParse(address(entry)).success);
-}, "Use one or more email addresses, separated by commas");
+  const entries = recipientsOf(value);
+  return entries.length > 0 && entries.length <= 20 && entries.every((entry) => z.email().safeParse(addressOf(entry)).success);
+}, "Use one to 20 email addresses, separated by commas");
 
 /** Gmail message and thread ids: they go into API paths. */
 const gmailId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Not a Gmail id");
@@ -40,7 +62,8 @@ export const inputs = {
   }),
   slackThread: z.object({ channel: slackChannel, ts: slackTs.describe("Parent message ts") }),
   slackPost: z.object({ channel: slackChannel, text: z.string().min(1).max(40_000), threadTs: slackTs.optional() }),
-  gmailSearch: z.object({ query, maxResults: z.number().int().min(1).max(50).optional() }),
+  // An empty Gmail query means all mail, newest first.
+  gmailSearch: z.object({ query: z.string().max(1000), maxResults: z.number().int().min(1).max(50).optional() }),
   gmailReadThread: z.object({ threadId: gmailId }),
   email: z.object({
     to: recipients,

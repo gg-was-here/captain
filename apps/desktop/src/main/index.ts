@@ -17,6 +17,9 @@ app.setPath("userData", join(app.getPath("appData"), "Captain"));
 
 registerAppScheme();
 app.setAsDefaultProtocolClient("captain");
+// Built apps could leak data in hostnames through <link rel="dns-prefetch">, which Chromium resolves
+// directly rather than through the app sessions' proxy. Bambii doesn't need DNS prefetching.
+app.commandLine.appendSwitch("dns-prefetch-disable");
 
 let mainWindow: BrowserWindow | undefined;
 let space: SpaceManager | undefined;
@@ -79,12 +82,14 @@ function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
   void window.loadURL(`${ORIGIN}${startPath}`);
 
   space = new SpaceManager(window, ORIGIN);
-  window.webContents.on("did-start-navigation", (_e, url, _inPlace, isMainFrame) => {
-    // Leaving the thread page tears down its Space.
-    if (isMainFrame && !isCaptainUrl(url)) space?.close();
+  window.webContents.on("did-start-navigation", (details) => {
+    // A new document (another thread from a deep link, a reload) never runs the page's own cleanup, so the
+    // Space it had open is closed here.
+    if (details.isMainFrame && !details.isSameDocument) space?.close();
   });
   window.on("closed", () => {
     if (mainWindow !== window) return;
+    space?.close();
     mainWindow = undefined;
     space = undefined;
   });
@@ -107,7 +112,7 @@ function restrictPermissions() {
     callback(WEB_PERMISSIONS.has(permission) && audioOnly && isCaptainUrl(details.requestingUrl));
   });
   session.defaultSession.setPermissionCheckHandler(
-    (_webContents, permission, requestingOrigin) => WEB_PERMISSIONS.has(permission) && requestingOrigin === ORIGIN,
+    (_webContents, permission, requestingOrigin) => WEB_PERMISSIONS.has(permission) && isCaptainUrl(requestingOrigin),
   );
 }
 

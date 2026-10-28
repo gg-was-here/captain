@@ -1,5 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
-import { mayUseSession } from "@captain/core/session-owners";
+import { mayUseSession, SESSION_ID } from "@captain/core/session-owners";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { listThreads } from "@/lib/server/data";
@@ -12,7 +12,7 @@ export const GET = route(async (request: Request) => {
 
 const createThread = z.object({
   agent: z.string().min(1).max(64),
-  sessionId: z.string().max(128).optional(),
+  sessionId: z.string().regex(SESSION_ID).optional(),
   title: z.string().max(120).optional(),
   preview: z.string().max(200).optional(),
   instructions: z.string().max(4000).optional(),

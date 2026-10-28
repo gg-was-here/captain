@@ -97,6 +97,10 @@ function headerValue(name: string, value: string) {
   return value;
 }
 
+/** The subject a message is sent with: replies in a thread get "Re:", which Gmail needs to thread them. */
+export const replySubject = (subject: string, threadId?: string) =>
+  threadId && !/^re:/i.test(subject.trim()) ? `Re: ${subject}` : subject;
+
 interface Email {
   to: string;
   subject: string;
@@ -109,25 +113,30 @@ interface Email {
  * a matching subject, so look those up from the thread's latest message.
  */
 async function replyHeaders(token: string, threadId: string) {
-  const thread = await gmail<{ messages?: { payload: GmailPayload }[] }>(
+  const thread = await gmail<{ messages?: { labelIds?: string[]; payload: GmailPayload }[] }>(
     token,
-    `/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=Subject`,
+    `/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=In-Reply-To`,
   );
-  const last = thread.messages?.at(-1)?.payload;
+  // The latest message the recipients actually received: the bots often save a draft before sending.
+  const last = (thread.messages ?? [])
+    .slice()
+    .reverse()
+    .find((message) => !message.labelIds?.includes("DRAFT") && header(message.payload, "Message-ID"))?.payload;
   const messageId = last && header(last, "Message-ID");
   if (!last || !messageId) return {};
   // These come from a received email, so they get no say in the message's structure either.
   const clean = (value: string) => value.replace(/[\r\n\0]/g, " ");
-  const references = [header(last, "References"), messageId].filter(Boolean).join(" ");
-  return { inReplyTo: clean(messageId), references: clean(references) };
+  const ids = [...(header(last, "References") ?? header(last, "In-Reply-To") ?? "").split(/\s+/).filter(Boolean), messageId];
+  // Keep the thread's first message and the latest ones, so the header stays a sensible length.
+  const references = ids.length > 12 ? [ids[0], ...ids.slice(-11)] : ids;
+  return { inReplyTo: clean(messageId), references: clean(references.join(" ")) };
 }
 
 async function rawMessage(token: string, { to, subject, body, threadId }: Email) {
   const reply = threadId ? await replyHeaders(token, threadId) : {};
-  const replySubject = threadId && !/^re:/i.test(subject.trim()) ? `Re: ${subject}` : subject;
   const lines = [
     `To: ${headerValue("recipients", to)}`,
-    `Subject: ${encodeHeader(headerValue("subject", replySubject))}`,
+    `Subject: ${encodeHeader(headerValue("subject", replySubject(subject, threadId)))}`,
     ...(reply.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.references}`] : []),
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=utf-8",

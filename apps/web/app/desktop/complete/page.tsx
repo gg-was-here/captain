@@ -19,8 +19,14 @@ export default function DesktopCompletePage() {
       router.replace("/");
       return;
     }
-    // The desktop app puts the ticket in the fragment, which links into the Mac app (captain://…) can't
-    // carry, so a website can't sign the app into another account.
+    // Only the Mac app redeems tickets. A website could otherwise send a signed-out browser here with a
+    // ticket for the attacker's own account (and later capture the Gmail or Slack it connects).
+    if (!window.captainDesktop) {
+      history.replaceState(null, "", window.location.pathname);
+      setError("Open this from the Bambii Mac app.");
+      return;
+    }
+    // The desktop app puts the ticket in the fragment, which links into the Mac app (captain://…) can't carry.
     const ticket = new URLSearchParams(window.location.hash.slice(1)).get("ticket");
     history.replaceState(null, "", window.location.pathname);
     if (!ticket) {
