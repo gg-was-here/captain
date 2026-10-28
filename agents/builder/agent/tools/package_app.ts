@@ -38,7 +38,13 @@ for (const f of walk(".")) {
 process.stdout.write(JSON.stringify({ dist, source, assets, skipped }));
 `;
 
-const isUniqueViolation = (error: unknown) => String(error).includes("UNIQUE constraint failed");
+/** Another build took this version number. drizzle wraps the SQLite error, so look through the causes. */
+function isUniqueViolation(error: unknown): boolean {
+  for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
+    if (/UNIQUE constraint failed|SQLITE_CONSTRAINT_(UNIQUE|PRIMARYKEY)/.test(`${String(e)} ${(e as { code?: unknown }).code ?? ""}`)) return true;
+  }
+  return false;
+}
 
 export default defineTool({
   description:
@@ -119,7 +125,10 @@ export default defineTool({
         assets: files.assets,
       });
     } catch (error) {
-      await db.delete(schema.appVersions).where(eq(schema.appVersions.id, rowId));
+      await db
+        .delete(schema.appVersions)
+        .where(eq(schema.appVersions.id, rowId))
+        .catch((cleanup: unknown) => console.error("[package_app] couldn't remove the unsaved version", rowId, cleanup));
       throw error;
     }
     await db

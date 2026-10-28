@@ -1,6 +1,6 @@
 import { loadBundle } from "@captain/core/bundles";
 import { getDb, schema } from "@captain/core/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { TEMPLATE_FILES } from "../lib/template-files";
@@ -50,7 +50,8 @@ export default defineTool({
     const [latest] = await db
       .select()
       .from(schema.appVersions)
-      .where(eq(schema.appVersions.appId, appId))
+      // Up to the current version: a newer row may still be uploading its bundle.
+      .where(and(eq(schema.appVersions.appId, appId), lte(schema.appVersions.version, app.currentVersion)))
       .orderBy(desc(schema.appVersions.version))
       .limit(1);
     const bundle = latest ? await loadBundle(latest.bundleKey) : null;

@@ -1,5 +1,6 @@
 import { getDb, schema } from "@captain/core/db";
 import { mayUseSession, SESSION_ID } from "@captain/core/session-owners";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { listThreads } from "@/lib/server/data";
@@ -26,6 +27,15 @@ export const POST = route(async (request: Request) => {
     throw new HttpError(403, "That chat belongs to another account");
   }
   const db = await getDb();
+  // A retried save (the first response was lost) gets the chat it already made, not a second one.
+  if (input.sessionId) {
+    const [existing] = await db
+      .select()
+      .from(schema.threads)
+      .where(and(eq(schema.threads.userId, user.id), eq(schema.threads.sessionId, input.sessionId)))
+      .limit(1);
+    if (existing) return Response.json({ thread: existing });
+  }
   const [thread] = await db
     .insert(schema.threads)
     .values({ id: `t_${nanoid(12)}`, userId: user.id, ...input })

@@ -1,7 +1,7 @@
 import "server-only";
 import { getVercelOidcToken } from "@vercel/oidc";
 
-const AGENTS = new Set(["captain", "builder", "app-bot"]);
+export const AGENTS = ["captain", "builder", "app-bot"] as const;
 
 /**
  * Where the bots are served. On Vercel it comes from the environment, never from the request, because the
@@ -16,14 +16,15 @@ function botsOrigin(requestOrigin: string): string {
 }
 
 /**
- * Ends a chat's eve session. Bots keep no copy once a session ends (they use zero retention), so this
- * deletes the conversation itself, and a Builder session's sandbox. On Vercel the web app calls the bot as
+ * Ends a chat's eve session. Bots keep no conversation once a session ends (they use zero retention), and
+ * a Builder session's sandbox goes with it; run metadata such as the session's title stays in Vercel
+ * Workflow for its retention period. On Vercel the web app calls the bot as
  * this deployment (Vercel OIDC), which the bots' channel trusts for any session; in local dev, where
  * there's no deployment identity, it passes the user's own cookie. Ending a session that has already
  * ended (or expired) succeeds.
  */
 export async function endSession(requestOrigin: string, agent: string, sessionId: string, cookie?: string): Promise<void> {
-  if (!AGENTS.has(agent)) return;
+  if (!(AGENTS as readonly string[]).includes(agent)) return;
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (process.env.VERCEL) headers.authorization = `Bearer ${await getVercelOidcToken()}`;
   else if (cookie) headers.cookie = cookie;

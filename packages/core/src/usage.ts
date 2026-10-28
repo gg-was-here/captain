@@ -114,15 +114,14 @@ export interface TokenUsage {
 
 /**
  * Usage in input-token equivalents, so one budget covers every model: Claude output costs five times its
- * input, cache reads a tenth and cache writes a quarter more.
+ * input, cache reads a tenth and cache writes a quarter more. `inputTokens` is the total input, cache reads
+ * and writes included (as eve and the AI SDK report it), so only the rest is charged at the full rate.
  */
 export function weightedTokens(usage: TokenUsage): number {
-  return Math.round(
-    (usage.inputTokens ?? 0) +
-      5 * (usage.outputTokens ?? 0) +
-      0.1 * (usage.cacheReadTokens ?? 0) +
-      1.25 * (usage.cacheWriteTokens ?? 0),
-  );
+  const cacheRead = usage.cacheReadTokens ?? 0;
+  const cacheWrite = usage.cacheWriteTokens ?? 0;
+  const uncached = Math.max(0, (usage.inputTokens ?? 0) - cacheRead - cacheWrite);
+  return Math.round(uncached + 5 * (usage.outputTokens ?? 0) + 0.1 * cacheRead + 1.25 * cacheWrite);
 }
 
 /** Adds a model call's usage to the user's daily token budget and the deployment's total. */

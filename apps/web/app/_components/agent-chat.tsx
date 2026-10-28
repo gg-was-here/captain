@@ -109,6 +109,10 @@ export function AgentChat({
   const saving = useRef<Promise<void> | undefined>(undefined);
   /** The session the saved thread points at. A new one (the first message, or after the old session ended) is saved. */
   const savedSessionId = useRef(sessionId);
+  /** A session whose save failed; it's tried again with the next message, not on every stream event. */
+  const saveFailedFor = useRef<string | undefined>(undefined);
+  /** Whether the server has confirmed the message being sent (its `message.received` arrived). */
+  const sendAccepted = useRef(false);
   const currentSessionId = useRef(sessionId);
 
   const savePreview = (preview: string) => {
@@ -124,8 +128,9 @@ export function AgentChat({
    * Save the thread with its session the first time eve hands us a session id, and save the new id when
    * the thread continues in a new session. A failed save is retried with the next message.
    */
-  const ensureThread = (nextSessionId: string) => {
+  const ensureThread = (nextSessionId: string, retry = false) => {
     if (savedSessionId.current === nextSessionId || saving.current) return;
+    if (saveFailedFor.current === nextSessionId && !retry) return;
     // Threads created from the + menu exist before their session.
     const request = threadId.current
       ? fetch(`/api/threads/${threadId.current}`, {
@@ -150,6 +155,7 @@ export function AgentChat({
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
         savedSessionId.current = nextSessionId;
+        saveFailedFor.current = undefined;
         setSaveError(undefined);
         if (!threadId.current) {
           threadId.current = body.thread.id;
@@ -162,6 +168,7 @@ export function AgentChat({
       })
       .catch((error: unknown) => {
         console.error("[chat] couldn't save the thread", error);
+        saveFailedFor.current = nextSessionId;
         setSaveError("This chat isn't saved to your sidebar yet. Bambii will try again with your next message.");
       })
       .finally(() => {
@@ -192,6 +199,9 @@ export function AgentChat({
     },
     onError(error) {
       sendFailure.current = error;
+    },
+    onEvent(event) {
+      if (event.type === "message.received") sendAccepted.current = true;
     },
   });
 
@@ -338,7 +348,7 @@ export function AgentChat({
     latestText.current = toPreviewText(text) || "📎 Attachment";
     // Existing threads get the preview now; a new thread carries it in its create request.
     savePreview(latestText.current);
-    if (agent.session !== undefined) ensureThread(agent.session.sessionId);
+    if (agent.session !== undefined) ensureThread(agent.session.sessionId, true);
     // An app's bot sees the app's on-device data on every turn; it never leaves the device otherwise.
     // A new Builder thread carries the name the user picked for the app.
     // The user's extra instructions for this thread ride along with every message.
@@ -370,10 +380,12 @@ export function AgentChat({
       });
     }
 
-    // eve reports a failed send through onError rather than rejecting; rethrowing keeps the composer's text.
+    // eve reports a failed send through onError rather than rejecting. Rethrowing keeps the composer's
+    // text, but only if the server never took the message: otherwise sending it again would duplicate it.
     sendFailure.current = undefined;
+    sendAccepted.current = false;
     await agent.send(message.files.length === 0 ? text : parts, options);
-    if (sendFailure.current) throw sendFailure.current;
+    if (sendFailure.current && !sendAccepted.current) throw sendFailure.current;
   };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -595,12 +607,15 @@ function explainSendError(error: Error | undefined, savedSessionId: string | und
     return "This chat can't continue: it started before the local dev server last restarted, and eve dev doesn't resume older chats. Start a new chat to keep going.";
   }
   if (isEveHttpError(error)) {
-    let errorId: unknown;
+    let body: { error?: unknown; errorId?: unknown } | undefined;
     try {
-      errorId = JSON.parse(error.body)?.errorId;
+      body = JSON.parse(error.body);
     } catch {}
-    const reference = typeof errorId === "string" ? errorId : error.headers["x-vercel-id"];
-    return describeFailure(error.status, error.status < 500 ? error.message : undefined, reference, "Bambii couldn't send your message.");
+    const reference = typeof body?.errorId === "string" ? body.errorId : error.headers["x-vercel-id"];
+    // Only a JSON reason from the server is shown as is; eve's text for anything else (an HTML firewall
+    // or error page) is meant for developers.
+    const reason = error.status < 500 && typeof body?.error === "string" ? body.error : undefined;
+    return describeFailure(error.status, reason, reference, "Bambii couldn't send your message.");
   }
   // fetch() rejects with a TypeError when there's no connection.
   if (error instanceof TypeError) return OFFLINE_MESSAGE;

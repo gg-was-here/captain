@@ -68,7 +68,13 @@ function bodyText(payload: GmailPayload): string {
   return "";
 }
 
-export async function searchEmail(
+/** Matching emails, newest first. Emails that failed to load are left out and logged; see `searchEmailReport`. */
+export async function searchEmail(token: string, input: { query: string; maxResults?: number }) {
+  return (await searchEmailReport(token, input)).emails;
+}
+
+/** Matching emails plus how many couldn't be loaded, so a caller can say the list is incomplete. */
+export async function searchEmailReport(
   token: string,
   { query, maxResults = 15 }: { query: string; maxResults?: number },
 ) {
@@ -92,10 +98,11 @@ export async function searchEmail(
       unread: msg.labelIds?.includes("UNREAD") ?? false,
     };
   });
-  const found = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
-  const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
-  if (failed && found.length === 0) throw failed.reason;
-  return found;
+  const emails = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length > 0 && emails.length === 0) throw failures[0].reason;
+  if (failures.length > 0) console.warn(`[gmail] ${failures.length} of ${results.length} emails couldn't be loaded`, failures[0].reason);
+  return { emails, failed: failures.length };
 }
 
 export async function readThread(token: string, { threadId }: { threadId: string }) {

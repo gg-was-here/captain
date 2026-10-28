@@ -39,7 +39,9 @@ describe("usage limits", () => {
   });
 
   it("weights tokens by what they cost", () => {
-    expect(usage.weightedTokens({ inputTokens: 1000, outputTokens: 100, cacheReadTokens: 1000, cacheWriteTokens: 100 })).toBe(1725);
+    // 2,100 input tokens in all: 1,000 uncached, 1,000 read from the cache, 100 written to it.
+    expect(usage.weightedTokens({ inputTokens: 2100, outputTokens: 100, cacheReadTokens: 1000, cacheWriteTokens: 100 })).toBe(1725);
+    expect(usage.weightedTokens({ inputTokens: 100_000, cacheReadTokens: 100_000 })).toBe(10_000);
   });
 
   it("stops model work once today's token budget is used", async () => {

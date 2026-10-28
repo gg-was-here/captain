@@ -1,13 +1,14 @@
 import { getModelSettings } from "@captain/core/models";
 import { assertWithinLimit, consumeRate, consumeUsage, recordTokens, refundUsage } from "@captain/core/usage";
-import { generateText } from "ai";
+import { APICallError, generateText, RetryError } from "ai";
 import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
 import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
-/** Room for a long answer; the model call itself is aborted a little before this. */
-export const maxDuration = 60;
+/** Room for the longest answer an app can ask for (16,000 tokens); the model call stops a little before this. */
+export const maxDuration = 300;
+const MODEL_TIMEOUT_MS = 285_000;
 
 const body = z.object({
   appId: z.string(),
@@ -48,11 +49,21 @@ export const POST = route(async (request: Request) => {
       prompt: input.prompt,
       maxOutputTokens: input.maxTokens ?? 4000,
       // Stop the model when the app goes away or the call runs too long, so neither keeps billing.
-      abortSignal: AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]),
+      abortSignal: AbortSignal.any([request.signal, AbortSignal.timeout(MODEL_TIMEOUT_MS)]),
     });
   } catch (error) {
-    // Nothing came back, so the call doesn't count against the app's daily AI requests.
-    await refundUsage(user.id, "ai").catch(() => {});
+    if (providerRefused(error)) {
+      // The model never ran, so the call doesn't count against the app's daily AI requests.
+      await refundUsage(user.id, "ai").catch(() => {});
+    } else {
+      // Stopped part-way (the app went away, or it ran too long): the model did bill, but reported no
+      // usage. Count the prompt and the most it could have written, so dropping connections can't dodge
+      // the daily budget.
+      await recordTokens(user.id, {
+        inputTokens: Math.ceil((system.length + input.prompt.length) / 4),
+        outputTokens: input.maxTokens ?? 4000,
+      }).catch((e: unknown) => console.error("[runtime/ai] couldn't record token usage", e));
+    }
     throw error;
   }
   await recordTokens(user.id, { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens }).catch(
@@ -66,6 +77,12 @@ export const POST = route(async (request: Request) => {
   }
   return Response.json({ text: result.text, object });
 });
+
+/** The provider answered with an error before generating anything (a rejected request, a rate limit, an outage). */
+function providerRefused(error: unknown): boolean {
+  const cause = RetryError.isInstance(error) ? error.lastError : error;
+  return APICallError.isInstance(cause);
+}
 
 /** The JSON value in a model reply, allowing for a code fence around it. */
 function parseJson(text: string): unknown {

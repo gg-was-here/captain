@@ -95,7 +95,8 @@ export async function GET(
     return new Response(BRIDGE_SCRIPT, { headers: { ...headers, "content-type": TYPES.js } });
   }
 
-  const version = await getAppVersion(app.id);
+  // The current version: a newer row may exist while its bundle is still uploading.
+  const version = await getAppVersion(app.id, app.currentVersion);
   const bundle = version
     ? await loadBundle(version.bundleKey).catch((error: unknown) => {
         console.error("[preview] couldn't load bundle", version.bundleKey, error);

@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
@@ -57,15 +57,20 @@ export const apps = sqliteTable(
   (t) => [index("apps_user_idx").on(t.userId)],
 );
 
-export const appVersions = sqliteTable("app_versions", {
-  id: text("id").primaryKey(),
-  appId: text("app_id").notNull(),
-  version: integer("version").notNull(),
-  /** Key in bundle storage (Vercel Blob in production, `.data/bundles` locally). */
-  bundleKey: text("bundle_key").notNull(),
-  notes: text("notes").notNull().default(""),
-  createdAt: timestamps.createdAt,
-});
+export const appVersions = sqliteTable(
+  "app_versions",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id").notNull(),
+    version: integer("version").notNull(),
+    /** Key in bundle storage (Vercel Blob in production, `.data/bundles` locally). */
+    bundleKey: text("bundle_key").notNull(),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamps.createdAt,
+  },
+  // One row per version; `db.ts` creates it (or a plain index on a database that already has duplicates).
+  (t) => [uniqueIndex("app_versions_app_version").on(t.appId, t.version)],
+);
 
 /** Per-user daily usage counters, for the limits in `usage.ts`. */
 export const usage = sqliteTable(

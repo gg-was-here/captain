@@ -60,11 +60,11 @@ export function errorResponse(error: unknown, request?: Request): Response {
     const headers = error.retryAfter === undefined ? undefined : { "retry-after": String(error.retryAfter) };
     return Response.json({ error: error.message }, { status: error.status, headers });
   }
-  const model = modelFailure(error);
-  if (model) return Response.json({ error: model.message }, { status: model.status });
-  // Unexpected: log it with an id the user can quote, and say nothing about internals.
+  // Logged with an id the user can quote; the response says nothing about internals.
   const reference = request?.headers.get("x-vercel-id") ?? crypto.randomUUID();
   console.error(`[${reference}]`, error);
+  const model = modelFailure(error);
+  if (model) return Response.json({ error: model.message, reference }, { status: model.status });
   return Response.json({ error: "Something went wrong. Please try again.", reference }, { status: 500 });
 }
 
@@ -78,5 +78,9 @@ function modelFailure(error: unknown): { status: number; message: string } | und
   if (cause.statusCode === 400 || cause.statusCode === 413) {
     return { status: 400, message: "The AI model couldn't take this request. It may be too long." };
   }
-  return { status: 503, message: "The AI service is busy right now. Try again in a minute." };
+  // Rate limits, overload and outages pass; anything else (a bad key, an unknown model) is ours to fix.
+  if (cause.statusCode === undefined || cause.statusCode === 429 || cause.statusCode >= 500) {
+    return { status: 503, message: "The AI service is busy right now. Try again in a minute." };
+  }
+  return { status: 500, message: "Something went wrong with the AI service. Please try again later." };
 }

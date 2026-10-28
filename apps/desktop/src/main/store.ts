@@ -95,6 +95,12 @@ async function writeBundle(bundle: AppBundle) {
   for (const [path, base64] of Object.entries(bundle.dist)) await write("dist", path, Buffer.from(base64, "base64"));
   for (const [path, text] of Object.entries(bundle.source)) await write("source", path, text);
   for (const [path, base64] of Object.entries(bundle.assets ?? {})) await write("source", path, Buffer.from(base64, "base64"));
+  // Downloads finish in any order: an older version arriving after a newer one mustn't replace it.
+  const installed = await readManifest(bundle.appId);
+  if (installed && installed.version > bundle.version) {
+    await rm(staging, { recursive: true, force: true });
+    return;
+  }
   await rm(versionDir, { recursive: true, force: true });
   await rename(staging, versionDir);
   const { dist: _d, source: _s, assets: _a, ...manifest } = bundle;
