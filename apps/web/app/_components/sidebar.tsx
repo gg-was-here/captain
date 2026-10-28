@@ -4,8 +4,9 @@ import { SYSTEM_BOTS } from "@captain/core/bots";
 import type { App, Thread } from "@captain/core/schema";
 import { SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api, errorText } from "@/lib/client/api";
 import { onRefreshSidebar } from "@/lib/client/events";
 import { avatarColor, cn, roundButton } from "@/lib/utils";
 import { NewThreadMenu } from "./new-thread-dialog";
@@ -21,27 +22,35 @@ function clip(text: string, max: number) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [apps, setApps] = useState<App[]>([]);
   const [initials, setInitials] = useState("");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
+  const [error, setError] = useState<string>();
+  const [deleting, setDeleting] = useState<string>();
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // A failed refresh keeps the lists already shown rather than emptying them.
   const load = useCallback(async () => {
-    const [t, a] = await Promise.all([
-      fetch("/api/threads").then((r) => (r.ok ? r.json() : { threads: [] })),
-      fetch("/api/apps").then((r) => (r.ok ? r.json() : { apps: [] })),
-    ]);
-    setThreads(t.threads);
-    setApps(a.apps);
+    try {
+      const [t, a] = await Promise.all([
+        api("/api/threads", undefined, "Couldn't load your chats.").then((r) => r.json()),
+        api("/api/apps", undefined, "Couldn't load your apps.").then((r) => r.json()),
+      ]);
+      setThreads(t.threads);
+      setApps(a.apps);
+      setError(undefined);
+    } catch (e) {
+      setError(errorText(e, "Couldn't load your chats."));
+    }
   }, []);
 
   useEffect(() => {
     void load();
     void fetch("/api/me")
       .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
       .then((body) => {
         const name: string = body?.user?.name ?? body?.user?.email ?? "Me";
         setInitials(
@@ -70,10 +79,26 @@ export function Sidebar() {
     ? threads.filter((t) => `${t.title} ${t.preview}`.toLowerCase().includes(needle))
     : threads;
 
-  const deleteThread = async (id: string) => {
-    await fetch(`/api/threads/${id}`, { method: "DELETE" });
-    if (pathname === `/t/${id}`) router.push("/new");
-    void load();
+  const deleteThread = async (thread: Thread) => {
+    if (deleting) return;
+    const kept = thread.agent === "builder" ? " Apps it built are kept." : "";
+    if (!window.confirm(`Delete "${thread.title}"? Its messages are deleted too and can't be recovered.${kept}`)) return;
+    setDeleting(thread.id);
+    setError(undefined);
+    try {
+      await api(`/api/threads/${thread.id}`, { method: "DELETE" }, "Couldn't delete this chat.");
+      // A chat started on this page moves to /t/<id> without the router knowing, so ask the browser,
+      // and load /new afresh so nothing of the deleted chat stays on screen.
+      if (window.location.pathname === `/t/${thread.id}`) {
+        window.location.assign("/new");
+        return;
+      }
+      await load();
+    } catch (e) {
+      setError(errorText(e, "Couldn't delete this chat."));
+    } finally {
+      setDeleting(undefined);
+    }
   };
 
   return (
@@ -118,6 +143,14 @@ export function Sidebar() {
       )}
 
       <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3 [-webkit-app-region:no-drag]">
+        {error ? (
+          <div className="mx-1 mb-2 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-destructive text-xs" role="alert">
+            <span className="min-w-0 flex-1">{error}</span>
+            <button className="shrink-0 font-medium underline" onClick={() => void load()} type="button">
+              Retry
+            </button>
+          </div>
+        ) : null}
         {visible.length === 0 ? (
           <p className="px-3 py-6 text-center text-muted-foreground text-xs">
             {needle ? "No threads match." : "Start a chat with the + button."}
@@ -155,8 +188,12 @@ export function Sidebar() {
                 </Link>
                 <button
                   aria-label="Delete thread"
-                  className="absolute top-1/2 right-2.5 hidden -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-destructive group-hover:block"
-                  onClick={() => void deleteThread(thread.id)}
+                  className={cn(
+                    "absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-destructive group-hover:block",
+                    deleting === thread.id ? "block animate-pulse" : "hidden",
+                  )}
+                  disabled={deleting !== undefined}
+                  onClick={() => void deleteThread(thread)}
                   type="button"
                 >
                   <Trash2Icon className="size-3.5" />

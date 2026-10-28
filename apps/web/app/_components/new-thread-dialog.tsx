@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { api, errorText } from "@/lib/client/api";
 import { refreshSidebar } from "@/lib/client/events";
 
 export type NewThreadKind = "message" | "application";
@@ -84,9 +85,13 @@ export function NewThreadDialog({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
-    if (kind) setName(randomName());
+    if (kind) {
+      setName(randomName());
+      setError(undefined);
+    }
   }, [kind]);
 
   const config = KINDS[kind ?? "message"];
@@ -98,17 +103,23 @@ export function NewThreadDialog({
   const create = async () => {
     if (!trimmed || creating) return;
     setCreating(true);
+    setError(undefined);
     try {
-      const res = await fetch("/api/threads", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ agent: config.agent, title: trimmed }),
-      });
-      if (!res.ok) return;
+      const res = await api(
+        "/api/threads",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ agent: config.agent, title: trimmed }),
+        },
+        "Couldn't create the chat.",
+      );
       const { thread } = await res.json();
       onOpenChange(false);
       refreshSidebar();
       router.push(`/t/${thread.id}`);
+    } catch (e) {
+      setError(errorText(e, "Couldn't create the chat."));
     } finally {
       setCreating(false);
     }
@@ -138,6 +149,11 @@ export function NewThreadDialog({
             placeholder="Name"
             value={name}
           />
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button className="rounded-full" onClick={() => onOpenChange(false)} type="button" variant="outline">
               Cancel

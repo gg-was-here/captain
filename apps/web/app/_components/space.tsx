@@ -27,6 +27,8 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
   // Bumped when the web preview's frame leaves the app, so it is replaced with a fresh one.
   const [frameKey, setFrameKey] = useState(0);
   const [link, setLink] = useState<string>();
+  // Bumped by "Try again" when the Mac app couldn't install or open the app.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!desktop || !hostRef.current) return;
@@ -54,7 +56,7 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
       window.removeEventListener("resize", onResize);
       desktop.closeSpace();
     };
-  }, [desktop, app.id, app.currentVersion]);
+  }, [desktop, app.id, app.currentVersion, attempt]);
 
   useEffect(() => {
     if (desktop && reloadKey > 0) desktop.reloadSpace();
@@ -71,8 +73,17 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
   return (
     <div className="relative size-full" ref={hostRef}>
       {desktop === undefined ? null : desktop ? (
-        state === "ready" ? null : (
-          <Placeholder>{state === "loading" ? `Installing ${app.name} on this Mac…` : `Couldn't open the app: ${error}`}</Placeholder>
+        state === "ready" ? null : state === "loading" ? (
+          <Placeholder>{`Installing ${app.name} on this Mac…`}</Placeholder>
+        ) : (
+          <Placeholder>
+            <span className="flex flex-col items-center gap-3">
+              <span>{`Couldn't open the app: ${error}`}</span>
+              <Button onClick={() => setAttempt((n) => n + 1)} size="sm" variant="outline">
+                Try again
+              </Button>
+            </span>
+          </Placeholder>
         )
       ) : app.currentVersion > 0 ? (
         <>

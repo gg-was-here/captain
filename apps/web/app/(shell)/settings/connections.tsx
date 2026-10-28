@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { api, errorText } from "@/lib/client/api";
 import { getDesktop, useDesktop } from "@/lib/client/desktop";
 
 type Connection = { name: string; label: string; status: "connected" | "disconnected" | "unavailable" };
@@ -21,14 +22,14 @@ export function Connections() {
 
   const load = useCallback(async (): Promise<Connection[] | null> => {
     try {
-      const response = await fetch("/api/connections");
+      const response = await api("/api/connections", undefined, "Couldn't load your connections.");
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
       setConnections(body.connections);
       return body.connections;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load your connections.");
-      setConnections([]);
+      setError(errorText(e, "Couldn't load your connections."));
+      // A failed refresh (e.g. on window focus) keeps the list already shown.
+      setConnections((current) => current ?? []);
       return null;
     }
   }, []);
@@ -55,9 +56,8 @@ export function Connections() {
     setNotice(undefined);
     try {
       const desktop = getDesktop();
-      const response = await fetch(`/api/connections/${name}${desktop ? "?desktop=1" : ""}`, { method: "POST" });
+      const response = await api(`/api/connections/${name}${desktop ? "?desktop=1" : ""}`, { method: "POST" }, "Couldn't start connecting.");
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
       if (desktop) {
         // The Mac app opens new windows in the default browser (Google blocks embedded sign-in).
         window.open(body.url, "_blank");
@@ -66,7 +66,7 @@ export function Connections() {
         window.location.assign(body.url);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e, "Couldn't start connecting."));
       setBusy(undefined);
     }
   };
@@ -77,10 +77,9 @@ export function Connections() {
     setError(undefined);
     setNotice(undefined);
     try {
-      const response = await fetch(`/api/connections/${connection.name}`, { method: "DELETE" });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't disconnect.");
+      await api(`/api/connections/${connection.name}`, { method: "DELETE" }, `Couldn't disconnect ${connection.label}.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e, `Couldn't disconnect ${connection.label}.`));
     }
     setBusy(undefined);
     void load();

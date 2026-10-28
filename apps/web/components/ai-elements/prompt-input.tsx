@@ -535,26 +535,35 @@ export const PromptInput = ({
     [accept],
   );
 
-  const addLocal = useCallback(
-    (fileList: File[] | FileList) => {
+  // The files that pass the type and size limits. Any that don't are reported, even when others pass,
+  // so nothing is dropped silently.
+  const screenFiles = useCallback(
+    (fileList: File[] | FileList): File[] => {
       const incoming = [...fileList];
       const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
+      if (accepted.length < incoming.length) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: accepted.length === 0 ? "No files match the accepted types." : "Some files aren't an accepted type and weren't added.",
         });
-        return;
       }
       const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
       const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
+      if (sized.length < accepted.length) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: sized.length === 0 ? "All files exceed the maximum size." : "Some files exceed the maximum size and weren't added.",
         });
-        return;
       }
+      return sized;
+    },
+    [matchesAccept, maxFileSize, onError],
+  );
+
+  const addLocal = useCallback(
+    (fileList: File[] | FileList) => {
+      const sized = screenFiles(fileList);
+      if (sized.length === 0) return;
 
       setItems((prev) => {
         const capacity =
@@ -579,7 +588,7 @@ export const PromptInput = ({
         return [...prev, ...next];
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError],
+    [screenFiles, maxFiles, onError],
   );
 
   const removeLocal = useCallback(
@@ -597,24 +606,8 @@ export const PromptInput = ({
   // Wrapper that validates files before calling provider's add
   const addWithProviderValidation = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
-        return;
-      }
+      const sized = screenFiles(fileList);
+      if (sized.length === 0) return;
 
       const currentCount = files.length;
       const capacity =
@@ -631,7 +624,7 @@ export const PromptInput = ({
         controller?.attachments.add(capped);
       }
     },
-    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller],
+    [screenFiles, maxFiles, onError, files.length, controller],
   );
 
   const clearAttachments = useCallback(
@@ -787,6 +780,19 @@ export const PromptInput = ({
     [referencedSources, clearReferencedSources],
   );
 
+  // Without a provider the form clears its text as soon as it's sent. If sending fails, put the text back
+  // (unless the user has started typing again), through the native setter so React's onChange sees it.
+  const restoreText = useCallback(
+    (form: HTMLFormElement, text: string) => {
+      if (usingProvider || !text) return;
+      const field = form.elements.namedItem("message");
+      if (!(field instanceof HTMLTextAreaElement) || field.value !== "") return;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    [usingProvider],
+  );
+
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback(
     async (event) => {
       event.preventDefault();
@@ -833,6 +839,7 @@ export const PromptInput = ({
             }
           } catch {
             // Don't clear on error - user may want to retry
+            restoreText(form, text);
           }
         } else {
           // Sync function completed without throwing, clear inputs
@@ -843,9 +850,10 @@ export const PromptInput = ({
         }
       } catch {
         // Don't clear on error - user may want to retry
+        restoreText(form, text);
       }
     },
-    [usingProvider, controller, files, onSubmit, clear],
+    [usingProvider, controller, files, onSubmit, clear, restoreText],
   );
 
   // Render with or without local provider

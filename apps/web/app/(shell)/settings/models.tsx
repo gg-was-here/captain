@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { api, errorText } from "@/lib/client/api";
 
 type Model = { id: string; label: string; description: string };
 type Role = "default" | "builder";
@@ -20,35 +21,39 @@ export function Models() {
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<Role>();
 
+  /** A save in flight. Saves run one at a time, so a failed one can put back what was there before it. */
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    void fetch("/api/settings/models")
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error);
+    void api("/api/settings/models", undefined, "Couldn't load your model settings.")
+      .then((response) => response.json())
+      .then((body) => {
         setModels(body.models);
         setDefaults(body.defaults);
         setSettings(body.settings);
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your model settings."));
+      .catch((e: unknown) => setError(errorText(e, "Couldn't load your model settings.")));
   }, []);
 
   const save = async (next: Settings, savedRole?: Role) => {
-    if (!settings) return;
+    if (!settings || saving) return;
     const previous = settings;
     setSettings(next);
     setError(undefined);
     setSaved(undefined);
+    setSaving(true);
     try {
-      const response = await fetch("/api/settings/models", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(next),
-      });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't save.");
+      await api(
+        "/api/settings/models",
+        { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) },
+        "Couldn't save your model settings.",
+      );
       setSaved(savedRole);
     } catch (e) {
       setSettings(previous);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e, "Couldn't save your model settings."));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -59,7 +64,7 @@ export function Models() {
       <div className="flex items-center justify-between gap-4">
         <h2 className="font-medium text-lg">Models</h2>
         {isDefault ? null : (
-          <Button onClick={() => defaults && void save(defaults)} size="sm" variant="ghost">
+          <Button disabled={saving} onClick={() => defaults && void save(defaults)} size="sm" variant="ghost">
             Reset to defaults
           </Button>
         )}
@@ -76,7 +81,7 @@ export function Models() {
               </p>
             </div>
             {settings ? (
-              <Select onValueChange={(id) => void save({ ...settings, [role]: id }, role)} value={settings[role]}>
+              <Select disabled={saving} onValueChange={(id) => void save({ ...settings, [role]: id }, role)} value={settings[role]}>
                 <SelectTrigger aria-label={label} className="w-52" size="sm">
                   {/* Just the name here; descriptions only show in the open menu. */}
                   <SelectValue>{models.find((m) => m.id === settings[role])?.label}</SelectValue>

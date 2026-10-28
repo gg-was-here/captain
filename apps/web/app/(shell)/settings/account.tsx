@@ -3,6 +3,7 @@
 import { useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { api, errorText } from "@/lib/client/api";
 
 /** Shown only when Clerk is configured. "_blank" opens in the default browser from the Mac app. */
 export function Account() {
@@ -18,13 +19,15 @@ export function Account() {
     if (!confirmed) return;
     setDeleting(true);
     setError(undefined);
-    const response = await fetch("/api/me", { method: "DELETE" });
-    if (!response.ok) {
-      setError((await response.json().catch(() => ({}))).error ?? "Couldn't delete your account.");
+    try {
+      await api("/api/me", { method: "DELETE" }, "Couldn't delete your account.");
+    } catch (e) {
+      setError(errorText(e, "Couldn't delete your account."));
       setDeleting(false);
       return;
     }
-    await signOut({ redirectUrl: "/sign-in" });
+    // The account is gone; if signing out fails, a reload lands on sign-in anyway.
+    await signOut({ redirectUrl: "/sign-in" }).catch(() => window.location.assign("/sign-in"));
   };
 
   return (
