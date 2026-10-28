@@ -40,7 +40,8 @@ export function serveAppBridge(
     "db.list": (collection: string) => listWebRecords(app.id, collection),
     "db.put": (collection: string, record: Record<string, unknown>) => putWebRecord(app.id, collection, record),
     "db.remove": (collection: string, id: string) => removeWebRecord(app.id, collection, id),
-    "ai.generate": ({ prompt, system, json }: Record<string, unknown> = {}) => runtime("ai", { prompt, system, json }),
+    "ai.generate": ({ prompt, system, json, maxTokens }: Record<string, unknown> = {}) =>
+      runtime("ai", { prompt, system, json, maxTokens }),
     "connectors.call": async (connector: string, action: string, input: Record<string, unknown>) =>
       (await runtime("connectors", { connector, action, input })).result,
     open: (url: unknown) => {

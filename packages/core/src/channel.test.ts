@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isCrossSiteWrite, routePath, sessionIdOf, trustedForwarders } from "./channel";
+import { isCrossSiteWrite, modelWork, routePath, sessionIdOf, trustedForwarders } from "./channel";
 
 type Forwarder = Parameters<typeof trustedForwarders>[0];
 type Assertion = Parameters<typeof trustedForwarders>[1];
@@ -89,5 +89,27 @@ describe("isCrossSiteWrite", () => {
 
   it("still checks cookie requests that carry another kind of Authorization header", () => {
     expect(isCrossSiteWrite(post({ authorization: "Basic eA==", "sec-fetch-site": "cross-site" }))).toBe(true);
+  });
+});
+
+describe("modelWork", () => {
+  const post = (path: string, body?: unknown) =>
+    new Request(`https://bambii.ai/eve/captain/v1/${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  it("finds every request that runs the model", async () => {
+    expect(await modelWork(post("session", { message: "hi" }))).toBe("message");
+    expect(await modelWork(post("session/wrun_123456/", { message: "hi" }))).toBe("message");
+    expect(await modelWork(post("session/wrun_123456", { inputResponses: [] }))).toBe("answers");
+    expect(await modelWork(post("session/wrun_123456/compact"))).toBe("compact");
+  });
+
+  it("ignores prewarms and controls", async () => {
+    expect(await modelWork(post("session"))).toBeUndefined();
+    expect(await modelWork(post("session/wrun_123456/cancel", {}))).toBeUndefined();
+    expect(await modelWork(new Request("https://bambii.ai/eve/captain/v1/session/wrun_123456/stream"))).toBeUndefined();
   });
 });

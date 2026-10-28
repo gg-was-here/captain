@@ -28,7 +28,8 @@ export interface CaptainBridge {
     remove(collection: string, id: string): Promise<void>;
   };
   ai: {
-    generate(request: { prompt: string; system?: string; json?: boolean }): Promise<{ text: string; object?: unknown }>;
+    /** `maxTokens` caps the answer's length: 4,000 tokens unless set, up to 16,000. */
+    generate(request: { prompt: string; system?: string; json?: boolean; maxTokens?: number }): Promise<{ text: string; object?: unknown }>;
   };
   connectors: {
     call(connector: ConnectorName, action: string, input?: Record<string, unknown>): Promise<unknown>;

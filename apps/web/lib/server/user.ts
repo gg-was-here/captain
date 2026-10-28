@@ -30,7 +30,10 @@ export function route<A extends unknown[]>(handler: (...args: A) => Promise<Resp
       return await handler(...args);
     } catch (error) {
       if (error instanceof HttpError) return Response.json({ error: error.message }, { status: error.status });
-      if (error instanceof UsageLimitError) return Response.json({ error: error.message }, { status: 429 });
+      if (error instanceof UsageLimitError) {
+        const headers = error.retryAfter === undefined ? undefined : { "retry-after": String(error.retryAfter) };
+        return Response.json({ error: error.message }, { status: 429, headers });
+      }
       console.error(error);
       return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }

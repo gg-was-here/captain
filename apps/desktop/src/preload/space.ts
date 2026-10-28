@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld("captain", {
     remove: (collection: string, id: string) => ipcRenderer.invoke("app:db:remove", collection, id),
   },
   ai: {
-    generate: (request: { prompt: string; system?: string; json?: boolean }) =>
+    generate: (request: { prompt: string; system?: string; json?: boolean; maxTokens?: number }) =>
       ipcRenderer.invoke("app:ai:generate", request),
   },
   connectors: {

@@ -1,5 +1,6 @@
 import { APP_ACTIONS, type AppActionConnector, ConnectorAuthError } from "@captain/core/connectors";
 import { emailPrompt, slackPostPrompt } from "@captain/core/tools/approval-prompts";
+import { consumeRate, consumeUsage } from "@captain/core/usage";
 import { z } from "zod";
 import { userToken } from "@/lib/server/connect";
 import { requireApp } from "@/lib/server/data";
@@ -24,6 +25,9 @@ export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
   const { appId, connector, action, input } = body.parse(await request.json());
   const app = await requireApp(user.id, appId);
+  // A runaway app loop could otherwise exhaust the user's Slack or Google API quota.
+  await consumeRate(user.id, "connector");
+  await consumeUsage(user.id, "connector");
 
   if (!app.connectors.includes(connector)) {
     throw new HttpError(403, `${app.name} is not allowed to use ${connector}`);

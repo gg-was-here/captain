@@ -269,10 +269,14 @@ export function registerAppBridge(current: () => SpaceManager | undefined) {
     store.removeRecord(appFor(e.sender).appId, collection, id),
   );
 
-  ipcMain.handle("app:ai:generate", async (e, request: { prompt?: unknown; system?: unknown; json?: unknown }) => {
-    const { space, appId } = appFor(e.sender);
-    return space.runtimeCall("ai", { prompt: request?.prompt, system: request?.system, json: request?.json, appId });
-  });
+  ipcMain.handle(
+    "app:ai:generate",
+    async (e, request: { prompt?: unknown; system?: unknown; json?: unknown; maxTokens?: unknown }) => {
+      const { space, appId } = appFor(e.sender);
+      const { prompt, system, json, maxTokens } = request ?? {};
+      return space.runtimeCall("ai", { prompt, system, json, maxTokens, appId });
+    },
+  );
 
   ipcMain.handle("app:connectors:call", async (e, connector: string, action: string, input: Record<string, unknown>) => {
     const { space, appId } = appFor(e.sender);

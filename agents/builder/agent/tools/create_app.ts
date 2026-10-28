@@ -1,5 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
-import { consumeUsage } from "@captain/core/usage";
+import { assertWithinLimit, consumeUsage } from "@captain/core/usage";
 import { defineTool } from "eve/tools";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -27,22 +27,25 @@ export default defineTool({
   async execute(input, ctx) {
     const userId = ctx.session.auth.current?.principalId;
     if (!userId) throw new Error("Sign in to Bambii to build apps.");
-    await consumeUsage(userId, "builds");
+    await assertWithinLimit(userId, "builds");
     const appId = `app_${nanoid(10)}`;
+
+    // Set up the files first, so a failure leaves no half-made app in the sidebar and uses no quota.
+    const sandbox = await ctx.getSandbox();
+    const dir = `/workspace/apps/${appId}`;
+    const copy = await sandbox.run({ command: `mkdir -p /workspace/apps && cp -R ${TEMPLATE_DIR} ${dir}` });
+    if (copy.exitCode !== 0) throw new Error(`Couldn't copy the app template: ${copy.stderr}`);
+    const indexPath = `${dir}/index.html`;
+    const html = await sandbox.readTextFile({ path: indexPath });
+    if (html === null) throw new Error("The app template is missing index.html");
+    await sandbox.writeTextFile({ path: indexPath, content: html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(input.name)}</title>`) });
+
+    await consumeUsage(userId, "builds");
     const db = await getDb();
     // When Captain delegates, this is a hidden child session: link the app to the user's Captain
     // thread (the root session) so "Edit app" can find it.
     const threadId = ctx.session.parent?.rootSessionId ?? ctx.session.id;
     await db.insert(schema.apps).values({ id: appId, userId, threadId, ...input });
-
-    const sandbox = await ctx.getSandbox();
-    const dir = `/workspace/apps/${appId}`;
-    const copy = await sandbox.run({ command: `mkdir -p /workspace/apps && cp -R ${TEMPLATE_DIR} ${dir}` });
-    if (copy.exitCode !== 0) throw new Error(copy.stderr);
-    await sandbox.run({
-      command: `sed -i 's#<title>.*</title>#<title>${input.name.replace(/[#&/\\]/g, "")}</title>#' index.html`,
-      workingDirectory: dir,
-    });
     return {
       appId,
       dir,
@@ -51,3 +54,6 @@ export default defineTool({
     };
   },
 });
+
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);

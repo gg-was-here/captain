@@ -3,7 +3,7 @@ import { eveChannel, type TrustedForwarders } from "eve/channels/eve";
 import type { SessionAuthContext } from "eve/context";
 import { captainAuth, clerkConfigured } from "./auth";
 import { mayUseSession } from "./session-owners";
-import { consumeUsage, UsageLimitError } from "./usage";
+import { assertWithinLimit, consumeUsage, UsageLimitError } from "./usage";
 
 const isCaptainUser = (context: SessionAuthContext | undefined) =>
   context?.authenticator === "captain" &&
@@ -41,19 +41,28 @@ export function isCrossSiteWrite(request: Request): boolean {
   return type !== null && !type.toLowerCase().startsWith("application/json");
 }
 
-/** Session create/follow-up requests that carry a user message (not prewarm, approvals or stream reads). */
-async function sendsMessage(request: Request) {
-  if (request.method !== "POST" || !/\/v1\/session(\/[^/]+)?$/.test(routePath(request))) return false;
+/**
+ * What a POST asks the bot to do with the model: a user message (create or follow-up), answers to open
+ * prompts (which resume the turn), or a compaction. Undefined for prewarms, stream reads and controls.
+ */
+export async function modelWork(request: Request): Promise<"message" | "answers" | "compact" | undefined> {
+  if (request.method !== "POST") return undefined;
+  const path = routePath(request);
+  if (/\/v1\/session\/[^/]+\/compact$/.test(path)) return "compact";
+  if (!/\/v1\/session(\/[^/]+)?$/.test(path)) return undefined;
   const body = await request
     .clone()
     .json()
     .catch(() => null);
-  return body?.message !== undefined;
+  if (body?.message !== undefined) return "message";
+  if (body?.inputResponses !== undefined) return "answers";
+  return undefined;
 }
 
 /**
  * Captain user auth for browser and Mac app requests. A request for an existing session must come from
- * the user who started it, and each message counts against the user's daily limit.
+ * the user who started it. Anything that runs the model needs token budget left today (usage is counted
+ * by the `usage-meter` hook), and each message counts against the daily message limit.
  */
 function captainUserAuth(): AuthFn<Request> {
   const auth = captainAuth();
@@ -69,9 +78,11 @@ function captainUserAuth(): AuthFn<Request> {
     if (sessionId !== undefined && !(await mayUseSession(result.principalId, sessionId, agentOf(request)))) {
       throw new ForbiddenError({ message: "This chat belongs to another account." });
     }
-    if (await sendsMessage(request)) {
+    const work = await modelWork(request);
+    if (work) {
       try {
-        await consumeUsage(result.principalId, "messages");
+        await assertWithinLimit(result.principalId, "tokens");
+        if (work === "message") await consumeUsage(result.principalId, "messages");
       } catch (error) {
         if (error instanceof UsageLimitError) throw new ForbiddenError({ message: error.message });
         throw error;
