@@ -210,11 +210,20 @@ export function readAllData(appId: string): Record<string, AppRecord[]> {
 }
 
 export function applyChanges(appId: string, changes: AppDataChange[]) {
+  const database = db(appId);
   const touched = new Set<string>();
-  for (const change of changes) {
-    if (change.op === "put") putRecord(appId, change.collection, change.record);
-    else removeRecord(appId, change.collection, change.id);
-    touched.add(change.collection);
+  // All or nothing, so a failure part-way through doesn't leave half a change set behind.
+  database.exec("BEGIN");
+  try {
+    for (const change of changes) {
+      if (change.op === "put") putRecord(appId, change.collection, change.record);
+      else removeRecord(appId, change.collection, change.id);
+      touched.add(change.collection);
+    }
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
   }
   return [...touched];
 }

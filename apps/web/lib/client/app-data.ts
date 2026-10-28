@@ -68,8 +68,11 @@ export async function applyAppChanges(appId: string, changes: AppDataChange[]) {
   }
 }
 
-/** Snapshot for the app bot's per-turn context: newest records first, bounded in size. */
-export async function appDataSnapshot(appId: string, maxChars = 60_000) {
+/**
+ * Snapshot for the app bot's per-turn context: newest records first, bounded in size. It's sent with every
+ * message, so it stays small.
+ */
+export async function appDataSnapshot(appId: string, maxChars = 20_000) {
   const data = await readAppData(appId);
   const snapshot: Record<string, { total: number; records: AppRecord[] }> = {};
   const perCollection = Math.floor(maxChars / Math.max(1, Object.keys(data).length));
@@ -87,11 +90,29 @@ export async function appDataSnapshot(appId: string, maxChars = 60_000) {
   return snapshot;
 }
 
-/** Apply each `update_app_data` tool result exactly once per device. */
-export async function applyOnce(callId: string, appId: string, changes: AppDataChange[]) {
+const applying = new Map<string, Promise<boolean>>();
+
+/**
+ * Applies each `update_app_data` tool result once per device; false if it already was. It's marked applied
+ * only once it succeeds, so a failure can be retried. Records it creates get ids from the call, so a
+ * retry after a partial failure updates them rather than adding duplicates.
+ */
+export function applyOnce(callId: string, appId: string, changes: AppDataChange[]): Promise<boolean> {
   const key = `captain:applied:${callId}`;
-  if (localStorage.getItem(key)) return false;
-  localStorage.setItem(key, "1");
-  await applyAppChanges(appId, changes);
-  return true;
+  if (localStorage.getItem(key)) return Promise.resolve(false);
+  const running = applying.get(key);
+  if (running) return running;
+  const withIds = changes.map((change, index) =>
+    change.op === "put" && typeof change.record.id !== "string"
+      ? { ...change, record: { ...change.record, id: `${callId}-${index}` } }
+      : change,
+  );
+  const work = applyAppChanges(appId, withIds)
+    .then(() => {
+      localStorage.setItem(key, "1");
+      return true;
+    })
+    .finally(() => applying.delete(key));
+  applying.set(key, work);
+  return work;
 }

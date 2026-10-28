@@ -2,7 +2,7 @@
 
 import type { EveDynamicToolPart } from "eve/react";
 import { CheckCircle2Icon, PlayIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { applyOnce } from "@/lib/client/app-data";
 import type { AppDataChange } from "@/lib/client/desktop";
@@ -12,6 +12,9 @@ type PackageResult = { ok: true; appId: string; version: number; name: string; i
 type DataResult = { appId: string; changes: AppDataChange[] };
 
 const toolName = (part: EveDynamicToolPart) => part.toolName.split("__").pop();
+
+/** The app an app-bot chat belongs to. Its tool results may change that app's data and no other's. */
+export const ThreadAppContext = createContext<string | undefined>(undefined);
 
 /** Rich renderings for Captain-specific tool results, shown under the tool card. */
 export function CaptainToolResult({ part }: { readonly part: EveDynamicToolPart }) {
@@ -52,15 +55,41 @@ export function AppReadyCard({ output }: { readonly output: Extract<PackageResul
 }
 
 function AppliedChanges({ callId, output }: { readonly callId: string; readonly output: DataResult }) {
-  const [applied, setApplied] = useState(false);
+  const threadAppId = useContext(ThreadAppContext);
+  const [state, setState] = useState<"applying" | "applied" | "failed">("applying");
+  const [attempt, setAttempt] = useState(0);
+  // The bot names the app in its tool call; anything other than this chat's own app is ignored.
+  const ours = threadAppId !== undefined && output.appId === threadAppId;
   useEffect(() => {
-    void applyOnce(callId, output.appId, output.changes).then(() => setApplied(true));
-  }, [callId, output]);
-  if (!applied) return null;
+    if (!ours) return;
+    setState("applying");
+    applyOnce(callId, output.appId, output.changes).then(
+      () => setState("applied"),
+      (error: unknown) => {
+        console.error("[app data] couldn't apply changes", error);
+        setState("failed");
+      },
+    );
+  }, [ours, callId, output, attempt]);
+  const count = `${output.changes.length} change${output.changes.length === 1 ? "" : "s"}`;
+  if (!ours) {
+    return <p className="my-1 text-muted-foreground text-xs">These changes were for a different app, so they weren't saved.</p>;
+  }
+  if (state === "failed") {
+    return (
+      <p className="my-1 flex items-center gap-1.5 text-destructive text-xs" role="alert">
+        Couldn't save {count} to the app on this device.
+        <button className="font-medium underline" onClick={() => setAttempt((n) => n + 1)} type="button">
+          Try again
+        </button>
+      </p>
+    );
+  }
+  if (state !== "applied") return null;
   return (
     <p className="my-1 flex items-center gap-1.5 text-muted-foreground text-xs">
       <CheckCircle2Icon className="size-3.5 text-emerald-600" />
-      Saved {output.changes.length} change{output.changes.length === 1 ? "" : "s"} to the app on this device
+      Saved {count} to the app on this device
     </p>
   );
 }
