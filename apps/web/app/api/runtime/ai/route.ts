@@ -6,8 +6,11 @@ import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
 import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
-/** Room for the longest answer an app can ask for (16,000 tokens); the model call stops a little before this. */
-export const maxDuration = 300;
+/**
+ * Room for the longest answer an app can ask for (16,000 tokens), a little inside the project's default
+ * 300 s function timeout. Don't export `maxDuration`: a route with its own config becomes a separate
+ * function, and the Hobby plan allows 12 per deployment.
+ */
 const MODEL_TIMEOUT_MS = 285_000;
 
 const body = z.object({
