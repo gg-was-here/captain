@@ -3,7 +3,7 @@
 import { PanelRightCloseIcon, PanelRightIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { roundButton } from "@/lib/utils";
-import { AgentChat, type BuiltApp, type ChatBot } from "./agent-chat";
+import { AgentChat, type BuiltApp, type ChatArchive, type ChatBot } from "./agent-chat";
 import { type SpaceApp, SpaceContext } from "./space";
 import { ThreadPanel } from "./thread-panel";
 
@@ -17,6 +17,7 @@ export function ThreadView({
   buildThreadId,
   title,
   instructions: initialInstructions = "",
+  archive,
 }: {
   readonly bot: ChatBot;
   readonly threadId?: string;
@@ -28,6 +29,8 @@ export function ThreadView({
   readonly title?: string;
   /** Extra instructions the user saved for this thread. */
   readonly instructions?: string;
+  /** The saved text of the thread's earlier session, if its session has expired or will. */
+  readonly archive?: ChatArchive;
 }) {
   const [spaceApp, setSpaceApp] = useState<SpaceApp | null>(
     initialSpaceApp && initialSpaceApp.currentVersion > 0 ? initialSpaceApp : null,
@@ -58,6 +61,7 @@ export function ThreadView({
     <SpaceContext.Provider value={space}>
       <AgentChat
         appId={appId}
+        archive={archive}
         bot={bot}
         instructions={instructions}
         key={`${bot.agent}:${initialThreadId ?? "new"}:${appId ?? ""}`}

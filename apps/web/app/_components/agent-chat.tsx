@@ -10,7 +10,7 @@ import {
   ConversationScrollButton,
   ConversationTopFade,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputButton,
@@ -60,6 +60,12 @@ const ATTACHMENT_ERRORS = {
 /** Thrown to keep the composer's text and attachments when a message can't be sent as is. */
 class ComposerError extends Error {}
 
+/** The saved text of a chat's earlier session (see `archive.ts`). */
+export interface ChatArchive {
+  readonly sessionId: string;
+  readonly messages: readonly { readonly role: "user" | "assistant"; readonly text: string }[];
+}
+
 export interface BuiltApp {
   readonly appId: string;
   readonly version: number;
@@ -77,6 +83,7 @@ export function AgentChat({
   instructions,
   panelToggle,
   title,
+  archive,
 }: {
   readonly bot: ChatBot;
   /** Name the user gave this thread; used instead of the first message as its title. */
@@ -92,6 +99,8 @@ export function AgentChat({
   readonly instructions?: string;
   /** Button that opens the thread's side panel, pinned to the top right. */
   readonly panelToggle?: ReactNode;
+  /** The saved text of this chat's earlier session, shown once that session has ended. */
+  readonly archive?: ChatArchive;
 }) {
   const AGENT_NAME = bot.name;
   const [cancellationError, setCancellationError] = useState<string>();
@@ -101,7 +110,7 @@ export function AgentChat({
   const [hasInputText, setHasInputText] = useState(false);
   /** The error eve reported while the current send ran; `handleSubmit` rethrows it so the composer keeps the text. */
   const sendFailure = useRef<Error | undefined>(undefined);
-  const eveHeaders = useEveHeaders();
+  const eveHeaders = useEveHeaders(() => threadId.current);
   const hasSubmittedMessage = useRef(false);
   const threadId = useRef(initialThreadId);
   const firstMessage = useRef<string>("");
@@ -310,7 +319,10 @@ export function AgentChat({
   const sessionLimitPrompts = Object.values(agent.data.inputs).filter(
     (input) => input.status === "open" && input.request.kind === "session-limit",
   );
-  const hasConversationContent = !isEmpty || errorMessage !== undefined || sessionEnded;
+  const activeSessionIdFor = () => agent.session?.sessionId ?? sessionId;
+  // While the saved session is still the live one, its own history shows instead.
+  const showArchive = archive !== undefined && archive.messages.length > 0 && (sessionEnded || archive.sessionId !== activeSessionIdFor());
+  const hasConversationContent = !isEmpty || errorMessage !== undefined || sessionEnded || showArchive;
   // A saved thread always opens as a chat: its name on top, the composer at the bottom.
   const showConversationLayout = isResuming || hasConversationContent || initialThreadId !== undefined;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
@@ -443,6 +455,7 @@ export function AgentChat({
           {/* Covers the see-through header too, so messages fade out behind it instead of under a band below it. */}
           <ConversationTopFade className="h-20 via-background via-60%" />
           <ConversationContent className="mx-auto w-full max-w-3xl gap-3 px-4 pt-20 pb-36 sm:px-6">
+            {showArchive ? <EarlierMessages messages={archive.messages} /> : null}
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
               isPendingAssistantShell &&
@@ -651,6 +664,22 @@ function SessionEnded({ onRestart }: { readonly onRestart: () => void }) {
         </div>
       </MessageContent>
     </Message>
+  );
+}
+
+/** A chat's messages from a session that has ended, saved as text and shown read-only. */
+function EarlierMessages({ messages }: { readonly messages: ChatArchive["messages"] }) {
+  return (
+    <>
+      {messages.map((message, index) => (
+        <Message from={message.role} key={`${index}:${message.role}`}>
+          <MessageContent>
+            {message.role === "assistant" ? <MessageResponse>{message.text}</MessageResponse> : <p className="whitespace-pre-wrap">{message.text}</p>}
+          </MessageContent>
+        </Message>
+      ))}
+      <p className="my-2 text-center text-muted-foreground text-xs">Earlier messages, from a session that has ended</p>
+    </>
   );
 }
 

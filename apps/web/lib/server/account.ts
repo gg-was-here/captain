@@ -75,5 +75,6 @@ export async function deleteAccountData(userId: string, origin: string, cookie?:
     db.delete(schema.userSettings).where(eq(schema.userSettings.userId, userId)),
     db.delete(schema.sessionOwners).where(eq(schema.sessionOwners.userId, userId)),
     db.delete(schema.sentActions).where(eq(schema.sentActions.userId, userId)),
+    db.delete(schema.threadArchives).where(eq(schema.threadArchives.userId, userId)),
   ]);
 }

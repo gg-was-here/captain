@@ -113,6 +113,22 @@ export const sentActions = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.callId] })],
 );
 
+/**
+ * The text of a chat whose session started before sessions stopped expiring, saved before it expires, so
+ * the chat stays readable and its next session can be told what came before (see `archive.ts`).
+ */
+export const threadArchives = sqliteTable("thread_archives", {
+  threadId: text("thread_id").primaryKey(),
+  userId: text("user_id").notNull(),
+  /** The session the transcript came from. */
+  sessionId: text("session_id").notNull(),
+  /** `{ role, text }[]`, oldest first: messages only, no tool calls or results. */
+  messages: text("messages", { mode: "json" }).$type<{ role: "user" | "assistant"; text: string }[]>().notNull(),
+  /** Set once the session has ended, so there's nothing more to save. */
+  final: integer("final", { mode: "boolean" }).notNull().default(false),
+  savedAt: timestamps.updatedAt,
+});
+
 /** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
 export const userSettings = sqliteTable("user_settings", {
   userId: text("user_id").primaryKey(),

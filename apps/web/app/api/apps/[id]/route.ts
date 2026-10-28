@@ -34,6 +34,7 @@ export const DELETE = route(async (request: Request, { params }: Params) => {
     throw new HttpError(502, "Couldn't delete this app right now. Please try again.");
   }
   await db.batch([
+    db.delete(schema.threadArchives).where(inArray(schema.threadArchives.threadId, chats.length ? chats.map((c) => c.id) : [""])),
     db.delete(schema.threads).where(inArray(schema.threads.id, chats.length ? chats.map((c) => c.id) : [""])),
     db.delete(schema.appVersions).where(eq(schema.appVersions.appId, app.id)),
     db.delete(schema.apps).where(and(eq(schema.apps.id, app.id), eq(schema.apps.userId, user.id))),

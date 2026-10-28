@@ -58,15 +58,23 @@ export function requestTimeZone(request: Request): string | undefined {
   }
 }
 
+/** The chat a bot request belongs to (`x-captain-thread`), if it looks like a thread id. */
+export function requestThreadId(request: Request): string | undefined {
+  const id = request.headers.get("x-captain-thread");
+  return id && /^t_[\w-]{1,32}$/.test(id) ? id : undefined;
+}
+
 /**
  * eve channel auth: maps the Captain user to a user principal so per-user connectors work. The user's
- * time zone rides along as an attribute for the bots' "today" instruction.
+ * time zone and the chat the request belongs to ride along as attributes, for the bots' "today" and
+ * "earlier conversation" instructions.
  */
 export function captainAuth(): AuthFn<Request> {
   return async (request) => {
     const user = await resolveUser(request);
     if (!user) return null;
     const timeZone = requestTimeZone(request);
+    const threadId = requestThreadId(request);
     return {
       authenticator: "captain",
       issuer: clerkConfigured() ? "clerk" : "local",
@@ -76,6 +84,7 @@ export function captainAuth(): AuthFn<Request> {
         ...(user.email ? { email: user.email } : {}),
         ...(user.name ? { name: user.name } : {}),
         ...(timeZone ? { timeZone } : {}),
+        ...(threadId ? { threadId } : {}),
       },
     };
   };

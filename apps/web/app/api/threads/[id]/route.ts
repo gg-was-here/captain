@@ -57,6 +57,9 @@ export const DELETE = route(async (request: Request, { params }: Params) => {
     }
   }
   const db = await getDb();
-  await db.delete(schema.threads).where(and(eq(schema.threads.id, thread.id), eq(schema.threads.userId, user.id)));
+  await db.batch([
+    db.delete(schema.threadArchives).where(eq(schema.threadArchives.threadId, thread.id)),
+    db.delete(schema.threads).where(and(eq(schema.threads.id, thread.id), eq(schema.threads.userId, user.id))),
+  ]);
   return new Response(null, { status: 204 });
 });
