@@ -400,9 +400,22 @@ function InputRequestActions({
         ? "Approved"
         : "Denied";
 
+  // eve's generic prompt ("Approve Notion create pages?") says nothing about the content, so show the
+  // tool input open; tools with their own prompt already spell it out, so it's one click away instead.
+  const genericPrompt = /^Approve [^\n]*\?$/.test(inputRequest.prompt);
+  const input = part.input === undefined ? undefined : JSON.stringify(part.input, null, 2);
+
   return (
     <div className="space-y-3 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-3">
-      <p className="text-muted-foreground text-sm">{inputRequest.prompt}</p>
+      <p className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words text-muted-foreground text-sm">
+        {inputRequest.prompt}
+      </p>
+      {input && inputRequest.kind === "tool-approval" ? (
+        <details className="text-xs" open={genericPrompt}>
+          <summary className="cursor-pointer text-muted-foreground">Details</summary>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2">{input}</pre>
+        </details>
+      ) : null}
       {inputResponse || settledApproval ? (
         <p className="font-medium text-sm">
           Responded:{" "}

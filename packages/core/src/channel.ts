@@ -17,6 +17,9 @@ export function sessionIdOf(request: Request): string | undefined {
   return id === undefined ? undefined : decodeURIComponent(id);
 }
 
+/** The bot a request is for, from its `/eve/<agent>/v1/...` path. */
+const agentOf = (request: Request) => new URL(request.url).pathname.match(/\/eve\/([^/]+)\/v1\//)?.[1];
+
 /** Session create/follow-up requests that carry a user message (not prewarm, approvals or stream reads). */
 async function sendsMessage(request: Request) {
   if (request.method !== "POST" || !/\/v1\/session(\/[^/]+)?$/.test(new URL(request.url).pathname)) return false;
@@ -36,8 +39,12 @@ function captainUserAuth(): AuthFn<Request> {
   return async (request) => {
     const result = await auth(request);
     if (!result) return null;
+    // The compiled agent configuration (tools, instructions) is for operators, not users.
+    if (clerkConfigured() && request.method === "GET" && /\/v1\/info$/.test(new URL(request.url).pathname)) {
+      throw new ForbiddenError({ message: "Not available." });
+    }
     const sessionId = sessionIdOf(request);
-    if (sessionId !== undefined && !(await mayUseSession(result.principalId, sessionId))) {
+    if (sessionId !== undefined && !(await mayUseSession(result.principalId, sessionId, agentOf(request)))) {
       throw new ForbiddenError({ message: "This chat belongs to another account." });
     }
     if (await sendsMessage(request)) {

@@ -1,26 +1,27 @@
-import { CONNECTORS } from "../connectors/index";
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
+import { CONNECTORS } from "../connectors/index";
 
-export default defineMcpClientConnection({
-  url: "https://mcp.notion.com/mcp",
-  description: "Notion workspace: search and edit pages and databases.",
-  auth: connect(CONNECTORS.notion.uid),
+/**
+ * The user's Notion, through Notion's MCP server. Tools the server marks read-only run directly. Any
+ * other tool (create, update, move) waits for the user's approval, or is refused for bots that should
+ * only read, so a prompt injected through a message or page can't silently rewrite the workspace.
+ */
+export function notionConnection({ writes }: { writes: "approve" | "refuse" }) {
+  return defineMcpClientConnection({
+    url: "https://mcp.notion.com/mcp",
+    description:
+      writes === "refuse"
+        ? "Notion workspace: search and read pages and databases."
+        : "Notion workspace: search and edit pages and databases.",
+    auth: connect(CONNECTORS.notion.uid),
+    // Annotations are the server's own hints; a tool without them is treated as a write.
+    approval: ({ toolAnnotations }) => {
+      if (toolAnnotations?.readOnlyHint === true) return "not-applicable";
+      return writes === "refuse" ? { type: "denied", reason: "This bot can only read Notion." } : "user-approval";
+    },
+  });
+}
 
-  // For app-scoped authentication, replace the auth block above with:
-  // auth: connect({ connector: CONNECTORS.notion.uid, principalType: "app" }),
-
-  // For JWT bearer authentication, replace the auth block above with:
-  // auth: connect({
-  //   connector: CONNECTORS.notion.uid,
-  //   principalToSubject: (principal) => {
-  //     const email = principal.type === "user" ? principal.attributes?.email : undefined;
-  //     if (typeof email !== "string") {
-  //       throw new Error("JWT bearer authentication requires a user principal with an email.");
-  //     }
-  //     return { type: "jwt-bearer", sub: email };
-  //   },
-  // }),
-
-  // Notion also supports OpenAPI. See https://eve.dev/integrations/notion for that scaffold.
-});
+/** Bambii: reads directly, asks before every write. */
+export default notionConnection({ writes: "approve" });

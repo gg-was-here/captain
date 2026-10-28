@@ -41,13 +41,14 @@ describe("session owners", () => {
     expect(await mayUseSession("user_b", "s_legacy")).toBe(false);
   });
 
-  it("waits for an owner that is recorded just after the session starts", async () => {
-    const decision = mayUseSession("user_b", "s_new");
-    setTimeout(() => void recordSessionOwner("s_new", "user_a", "captain"), 100);
-    expect(await decision).toBe(false);
+  it("lets the first user of an unrecorded session claim it", async () => {
+    expect(await mayUseSession("user_a", "s_new")).toBe(true);
+    expect(await mayUseSession("user_b", "s_new")).toBe(false);
+    expect(await mayUseSession("user_a", "s_new")).toBe(true);
   });
 
-  it("allows a session that never got an owner", async () => {
-    expect(await mayUseSession("user_b", "s_unknown")).toBe(true);
+  it("gives a session to only one of two simultaneous first users", async () => {
+    const decisions = await Promise.all([mayUseSession("user_a", "s_race"), mayUseSession("user_b", "s_race")]);
+    expect(decisions.filter(Boolean)).toHaveLength(1);
   });
 });
