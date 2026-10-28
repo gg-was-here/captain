@@ -47,6 +47,11 @@ async function migrate(client: ReturnType<typeof createClient>) {
       `CREATE TABLE IF NOT EXISTS user_settings (
         user_id TEXT PRIMARY KEY, default_model TEXT, builder_model TEXT,
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS session_owners (
+        session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, agent TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+      // Owners for sessions started before they were recorded: the earliest thread that references a session wins.
+      `INSERT OR IGNORE INTO session_owners (session_id, user_id, agent, created_at)
+        SELECT session_id, user_id, 'unknown', created_at FROM threads WHERE session_id IS NOT NULL ORDER BY created_at`,
     ],
     "write",
   );

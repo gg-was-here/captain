@@ -1,4 +1,5 @@
 import { getDb, schema } from "@captain/core/db";
+import { mayUseSession } from "@captain/core/session-owners";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getThread } from "@/lib/server/data";
@@ -17,14 +18,17 @@ const updateThread = z.object({
   title: z.string().min(1).max(120).optional(),
   preview: z.string().max(200).optional(),
   instructions: z.string().max(4000).optional(),
-  sessionId: z.string().optional(),
-  appId: z.string().nullable().optional(),
+  sessionId: z.string().max(128).optional(),
+  appId: z.string().max(64).nullable().optional(),
 });
 
 export const PATCH = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
   const { id } = await params;
   const input = updateThread.parse(await request.json());
+  if (input.sessionId && !(await mayUseSession(user.id, input.sessionId))) {
+    throw new HttpError(403, "That chat belongs to another account");
+  }
   // Editing a thread's instructions alone shouldn't move it to the top of the sidebar.
   const instructionsOnly = Object.keys(input).every((key) => key === "instructions");
   const db = await getDb();

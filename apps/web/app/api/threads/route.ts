@@ -1,8 +1,9 @@
 import { getDb, schema } from "@captain/core/db";
+import { mayUseSession } from "@captain/core/session-owners";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { listThreads } from "@/lib/server/data";
-import { requireUser, route } from "@/lib/server/user";
+import { HttpError, requireUser, route } from "@/lib/server/user";
 
 export const GET = route(async (request: Request) => {
   const user = await requireUser(request);
@@ -10,17 +11,20 @@ export const GET = route(async (request: Request) => {
 });
 
 const createThread = z.object({
-  agent: z.string().min(1),
-  sessionId: z.string().optional(),
+  agent: z.string().min(1).max(64),
+  sessionId: z.string().max(128).optional(),
   title: z.string().max(120).optional(),
   preview: z.string().max(200).optional(),
   instructions: z.string().max(4000).optional(),
-  appId: z.string().optional(),
+  appId: z.string().max(64).optional(),
 });
 
 export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
   const input = createThread.parse(await request.json());
+  if (input.sessionId && !(await mayUseSession(user.id, input.sessionId))) {
+    throw new HttpError(403, "That chat belongs to another account");
+  }
   const db = await getDb();
   const [thread] = await db
     .insert(schema.threads)

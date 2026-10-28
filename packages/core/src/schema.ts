@@ -80,6 +80,15 @@ export const usage = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.day, t.kind] })],
 );
 
+/** Who started each eve session. eve doesn't check session ownership, so the channel does (see `session-owners.ts`). */
+export const sessionOwners = sqliteTable("session_owners", {
+  sessionId: text("session_id").primaryKey(),
+  userId: text("user_id").notNull(),
+  /** eve agent the session belongs to, e.g. `captain`, or `unknown` for owners backfilled from threads. */
+  agent: text("agent").notNull(),
+  createdAt: timestamps.createdAt,
+});
+
 /** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
 export const userSettings = sqliteTable("user_settings", {
   userId: text("user_id").primaryKey(),

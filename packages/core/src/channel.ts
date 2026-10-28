@@ -1,11 +1,21 @@
 import { type AuthFn, ForbiddenError, vercelOidc } from "eve/channels/auth";
-import { eveChannel } from "eve/channels/eve";
+import { eveChannel, type TrustedForwarders } from "eve/channels/eve";
 import type { SessionAuthContext } from "eve/context";
-import { captainAuth } from "./auth";
+import { captainAuth, clerkConfigured } from "./auth";
+import { mayUseSession } from "./session-owners";
 import { consumeUsage, UsageLimitError } from "./usage";
 
 const isCaptainUser = (context: SessionAuthContext | undefined) =>
-  context?.authenticator === "captain" && context.principalType === "user";
+  context?.authenticator === "captain" &&
+  context.principalType === "user" &&
+  // With Clerk configured, only Clerk-verified users; "local" users exist only in local dev.
+  (!clerkConfigured() || context.issuer === "clerk");
+
+/** The session a request addresses (`/v1/session/:id`, its sub-routes and subagent streams), if any. */
+export function sessionIdOf(request: Request): string | undefined {
+  const id = new URL(request.url).pathname.match(/\/v1\/session\/([^/]+)/)?.[1];
+  return id === undefined ? undefined : decodeURIComponent(id);
+}
 
 /** Session create/follow-up requests that carry a user message (not prewarm, approvals or stream reads). */
 async function sendsMessage(request: Request) {
@@ -17,12 +27,20 @@ async function sendsMessage(request: Request) {
   return body?.message !== undefined;
 }
 
-/** Captain user auth that also counts each message against the user's daily limit. */
-function meteredCaptainAuth(): AuthFn<Request> {
+/**
+ * Captain user auth for browser and Mac app requests. A request for an existing session must come from
+ * the user who started it, and each message counts against the user's daily limit.
+ */
+function captainUserAuth(): AuthFn<Request> {
   const auth = captainAuth();
   return async (request) => {
     const result = await auth(request);
-    if (result && (await sendsMessage(request))) {
+    if (!result) return null;
+    const sessionId = sessionIdOf(request);
+    if (sessionId !== undefined && !(await mayUseSession(result.principalId, sessionId))) {
+      throw new ForbiddenError({ message: "This chat belongs to another account." });
+    }
+    if (await sendsMessage(request)) {
       try {
         await consumeUsage(result.principalId, "messages");
       } catch (error) {
@@ -35,27 +53,33 @@ function meteredCaptainAuth(): AuthFn<Request> {
 }
 
 /**
- * The HTTP channel every Captain bot exposes.
- *
- * - Browser/Electron callers authenticate as Captain users, and each message
- *   they send counts against their daily limit.
- * - Other bots in this deployment (Vercel OIDC, same project only) may delegate
- *   work and forward the Captain user they act for, so per-user connectors
- *   resolve that user's tokens. They may not assert any other kind of identity.
- * - Trusted forwarders also pass parent session lineage (`ctx.session.parent`),
- *   which Builder uses to link a delegated app to the Captain thread.
+ * Vercel OIDC, limited to this deployment's own runtime (Captain delegating to Builder). Tokens from the
+ * same project's other environments (preview deployments, `vercel env pull`) authenticate as "service"
+ * principals; refusing them keeps them from acting for production users.
  */
+function runtimeOidc(): AuthFn<Request> {
+  const auth = vercelOidc();
+  return async (request) => {
+    const result = await auth(request);
+    return result?.principalType === "runtime" ? result : null;
+  };
+}
+
+/**
+ * Who may forward a Captain user to a bot (and pass parent session lineage, which Builder uses to link a
+ * delegated app to the Captain thread):
+ * - this deployment's own runtime, forwarding Clerk-verified Captain users only;
+ * - in local dev without Clerk, the single local user, because peer bots call each other over plain
+ *   HTTP there (see peers.ts) and subagents need to see their parent session.
+ */
+export const trustedForwarders: TrustedForwarders = (forwarder, assertion) =>
+  (forwarder.authenticator === "captain" && forwarder.issuer === "local" && !clerkConfigured()) ||
+  (forwarder.principalType === "runtime" &&
+    assertion.principal !== undefined &&
+    isCaptainUser(assertion.principal.current) &&
+    isCaptainUser(assertion.principal.initiator));
+
+/** The HTTP channel every Captain bot exposes. */
 export function captainChannel() {
-  return eveChannel({
-    auth: [meteredCaptainAuth(), vercelOidc()],
-    trustedForwarders: (forwarder, assertion) =>
-      // Local dev without Clerk: every caller is the single local user, and peer bots call each other
-      // over plain HTTP (see peers.ts). Trusting it lets subagents see their parent session.
-      (forwarder.authenticator === "captain" && forwarder.issuer === "local") ||
-      (forwarder.principalType !== "user" &&
-        forwarder.principalType !== "anonymous" &&
-        assertion.principal !== undefined &&
-        isCaptainUser(assertion.principal.current) &&
-        isCaptainUser(assertion.principal.initiator)),
-  });
+  return eveChannel({ auth: [captainUserAuth(), runtimeOidc()], trustedForwarders });
 }
