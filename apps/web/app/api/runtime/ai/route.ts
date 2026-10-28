@@ -4,7 +4,7 @@ import { generateText } from "ai";
 import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
 import { requireApp } from "@/lib/server/data";
-import { HttpError, requireUser, route } from "@/lib/server/user";
+import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
 /** Room for a long answer; the model call itself is aborted a little before this. */
 export const maxDuration = 60;
@@ -24,7 +24,7 @@ const JSON_INSTRUCTION = "Reply with only a JSON value: no prose, no explanation
 /** `captain.ai.generate()` for apps the user built. Billed to the Captain account, never exposes keys. */
 export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
-  const input = body.parse(await request.json());
+  const input = body.parse(await readJson(request));
   const app = await requireApp(user.id, input.appId);
   await consumeRate(user.id, "ai");
   await assertWithinLimit(user.id, "tokens");

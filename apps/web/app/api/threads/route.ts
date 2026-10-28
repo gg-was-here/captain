@@ -3,7 +3,7 @@ import { mayUseSession, SESSION_ID } from "@captain/core/session-owners";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { listThreads } from "@/lib/server/data";
-import { HttpError, requireUser, route } from "@/lib/server/user";
+import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
 export const GET = route(async (request: Request) => {
   const user = await requireUser(request);
@@ -21,7 +21,7 @@ const createThread = z.object({
 
 export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
-  const input = createThread.parse(await request.json());
+  const input = createThread.parse(await readJson(request));
   if (input.sessionId && !(await mayUseSession(user.id, input.sessionId))) {
     throw new HttpError(403, "That chat belongs to another account");
   }

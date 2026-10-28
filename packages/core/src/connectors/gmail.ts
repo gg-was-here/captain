@@ -1,16 +1,40 @@
-/** Thin Gmail REST client used by the gmail bot and by generated apps. */
-import { ConnectorAuthError } from "./slack";
+/** Thin Gmail REST client used by the bots and by generated apps. */
+import { ConnectorAuthError, fetchApi, upstreamError } from "./http";
 
 const BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 async function gmail<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await fetchApi("Gmail", `${BASE}${path}`, {
     ...init,
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init?.headers },
   });
   if (response.status === 401) throw new ConnectorAuthError("google");
-  if (!response.ok) throw new Error(`Gmail ${path} failed: ${response.status} ${await response.text()}`);
+  if (!response.ok) {
+    // Google's error body is JSON with a readable message; keep just that.
+    const detail = await response
+      .json()
+      .then((body: { error?: { message?: string } }) => body.error?.message)
+      .catch(() => undefined);
+    throw upstreamError("Gmail", response, path.split("?")[0], detail);
+  }
   return (await response.json()) as T;
+}
+
+/** Runs `work` over `items` at most `limit` at a time, keeping each result or failure in order. */
+async function settleAll<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await work(items[index]).then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (reason: unknown) => ({ status: "rejected" as const, reason }),
+      );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 interface GmailPayload {
@@ -52,23 +76,26 @@ export async function searchEmail(
     token,
     `/messages?${new URLSearchParams({ q: query, maxResults: String(maxResults) })}`,
   );
-  return Promise.all(
-    (list.messages ?? []).map(async ({ id, threadId }) => {
-      const msg = await gmail<{ snippet: string; labelIds?: string[]; payload: GmailPayload }>(
-        token,
-        `/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-      );
-      return {
-        id,
-        threadId,
-        from: header(msg.payload, "From"),
-        subject: header(msg.payload, "Subject"),
-        date: header(msg.payload, "Date"),
-        snippet: msg.snippet,
-        unread: msg.labelIds?.includes("UNREAD") ?? false,
-      };
-    }),
-  );
+  // Five at a time keeps within Gmail's per-user limits; one message failing doesn't lose the rest.
+  const results = await settleAll(list.messages ?? [], 5, async ({ id, threadId }) => {
+    const msg = await gmail<{ snippet: string; labelIds?: string[]; payload: GmailPayload }>(
+      token,
+      `/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+    );
+    return {
+      id,
+      threadId,
+      from: header(msg.payload, "From"),
+      subject: header(msg.payload, "Subject"),
+      date: header(msg.payload, "Date"),
+      snippet: msg.snippet,
+      unread: msg.labelIds?.includes("UNREAD") ?? false,
+    };
+  });
+  const found = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+  const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failed && found.length === 0) throw failed.reason;
+  return found;
 }
 
 export async function readThread(token: string, { threadId }: { threadId: string }) {

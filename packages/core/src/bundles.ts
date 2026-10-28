@@ -19,6 +19,8 @@ export interface AppBundle {
   dist: Record<string, string>;
   /** Source files, path → utf8 text. */
   source: Record<string, string>;
+  /** Binary source files (images, fonts), path → base64. Missing in bundles made before it existed. */
+  assets?: Record<string, string>;
 }
 
 const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -53,15 +55,17 @@ export async function deleteBundles(keys: string[]): Promise<void> {
   }
 }
 
+/** The bundle stored under `key`, or null if there is none. Storage failures throw, so they aren't mistaken for "not built". */
 export async function loadBundle(key: string): Promise<AppBundle | null> {
+  if (useBlob()) {
+    const result = await get(key, { access: "private" });
+    if (!result || result.statusCode !== 200) return null;
+    return (await new Response(result.stream).json()) as AppBundle;
+  }
   try {
-    if (useBlob()) {
-      const result = await get(key, { access: "private" });
-      if (!result || result.statusCode !== 200) return null;
-      return (await new Response(result.stream).json()) as AppBundle;
-    }
     return JSON.parse(await readFile(join(localDataDir(), "bundles", key), "utf8")) as AppBundle;
-  } catch {
-    return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
   }
 }

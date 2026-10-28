@@ -35,8 +35,9 @@ export type ConnectionStatus = "connected" | "disconnected" | "unavailable";
 export async function connectionStatus(user: CaptainUser, name: ConnectorName): Promise<ConnectionStatus> {
   try {
     return (await userToken(user, name)) ? "connected" : "disconnected";
-  } catch {
-    // Connector not registered yet, or no Vercel OIDC credentials locally.
+  } catch (error) {
+    // Connector not registered yet, no Vercel OIDC credentials locally, or Connect is down: log which.
+    console.error(`[connect] couldn't check ${name}`, error);
     return "unavailable";
   }
 }

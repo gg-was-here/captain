@@ -3,7 +3,7 @@ import { mayUseSession, SESSION_ID } from "@captain/core/session-owners";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getThread } from "@/lib/server/data";
-import { HttpError, requireUser, route } from "@/lib/server/user";
+import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -25,7 +25,7 @@ const updateThread = z.object({
 export const PATCH = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
   const { id } = await params;
-  const input = updateThread.parse(await request.json());
+  const input = updateThread.parse(await readJson(request));
   if (input.sessionId && !(await mayUseSession(user.id, input.sessionId))) {
     throw new HttpError(403, "That chat belongs to another account");
   }

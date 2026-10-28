@@ -61,18 +61,35 @@ async function migrate(client: ReturnType<typeof createClient>) {
     ],
     "write",
   );
-  // Columns added after the first release.
+  // Columns added after the first release. Only "already there" is expected; anything else is a real failure.
   for (const statement of [
     `ALTER TABLE threads ADD COLUMN preview TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE threads ADD COLUMN instructions TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE apps ADD COLUMN tagline TEXT NOT NULL DEFAULT ''`,
   ]) {
-    await client.execute(statement).catch(() => {});
+    await client.execute(statement).catch((error: unknown) => {
+      if (!String(error).includes("duplicate column")) throw error;
+    });
   }
+  // One row per app version. A database that already has duplicates (from builds that raced before this
+  // index) gets a plain index instead of failing to start.
+  await client
+    .execute("CREATE UNIQUE INDEX IF NOT EXISTS app_versions_app_version ON app_versions (app_id, version)")
+    .catch(async (error: unknown) => {
+      console.error("[db] app_versions has duplicate versions; using a non-unique index", error);
+      await client.execute("CREATE INDEX IF NOT EXISTS app_versions_app_idx ON app_versions (app_id, version)");
+    });
 }
 
 export async function getDb() {
   globalForDb.__captainDb ??= createDb();
-  await globalForDb.__captainDb.ready;
-  return globalForDb.__captainDb.db;
+  const current = globalForDb.__captainDb;
+  try {
+    await current.ready;
+  } catch (error) {
+    // A failed bootstrap (a brief Turso outage, say) mustn't break this instance for good: the next call retries.
+    if (globalForDb.__captainDb === current) globalForDb.__captainDb = undefined;
+    throw error;
+  }
+  return current.db;
 }

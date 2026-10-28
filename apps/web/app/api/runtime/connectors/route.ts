@@ -4,7 +4,7 @@ import { consumeRate, consumeUsage } from "@captain/core/usage";
 import { z } from "zod";
 import { userToken } from "@/lib/server/connect";
 import { requireApp } from "@/lib/server/data";
-import { HttpError, requireUser, route } from "@/lib/server/user";
+import { HttpError, readJson, requireUser, route } from "@/lib/server/user";
 
 const body = z.object({
   appId: z.string(),
@@ -23,7 +23,7 @@ const body = z.object({
  */
 export const POST = route(async (request: Request) => {
   const user = await requireUser(request);
-  const { appId, connector, action, input } = body.parse(await request.json());
+  const { appId, connector, action, input } = body.parse(await readJson(request));
   const app = await requireApp(user.id, appId);
   // A runaway app loop could otherwise exhaust the user's Slack or Google API quota.
   await consumeRate(user.id, "connector");

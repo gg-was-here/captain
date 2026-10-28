@@ -96,7 +96,13 @@ export async function GET(
   }
 
   const version = await getAppVersion(app.id);
-  const bundle = version ? await loadBundle(version.bundleKey) : null;
+  const bundle = version
+    ? await loadBundle(version.bundleKey).catch((error: unknown) => {
+        console.error("[preview] couldn't load bundle", version.bundleKey, error);
+        return undefined;
+      })
+    : null;
+  if (bundle === undefined) return new Response("Couldn't load this app right now. Try again.", { status: 503 });
   if (!bundle) return new Response("This app has not been built yet", { status: 404 });
   const isPage = !file.includes(".") || file === "index.html";
   const content = isPage ? bundle.dist["index.html"] : bundle.dist[file];

@@ -4,7 +4,7 @@ import * as slack from "./slack";
 
 export { gmail, slack };
 export { inputs } from "./inputs";
-export { ConnectorAuthError } from "./slack";
+export { ConnectorAuthError, UpstreamError } from "./http";
 
 /**
  * Vercel Connect connector UIDs. Register them once with

@@ -118,7 +118,7 @@ export class SpaceManager {
     if (!store.isInstalled(appId, version) || (await store.readManifest(appId))?.version !== version) {
       const response = await this.backend(`/api/apps/${encodeURIComponent(appId)}/bundle?version=${version}`);
       if (!response.ok) throw new Error(`Download failed (${response.status})`);
-      await store.installBundle(await response.json());
+      await store.installBundle(await response.json(), { appId, version });
     }
     const manifest = await store.readManifest(appId);
     if (!manifest) throw new Error("App manifest missing");

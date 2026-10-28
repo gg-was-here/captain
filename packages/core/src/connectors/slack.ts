@@ -1,4 +1,7 @@
-/** Thin Slack Web API client used by the slack bot and by generated apps. */
+/** Thin Slack Web API client used by the bots and by generated apps. */
+import { ConnectorAuthError, fetchApi, UpstreamError, upstreamError } from "./http";
+
+export { ConnectorAuthError } from "./http";
 
 async function slack<T = Record<string, unknown>>(
   token: string,
@@ -11,32 +14,26 @@ async function slack<T = Record<string, unknown>>(
     if (value !== undefined) query.set(key, String(value));
   }
   const response = init.post
-    ? await fetch(`https://slack.com/api/${method}`, {
+    ? await fetchApi("Slack", `https://slack.com/api/${method}`, {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json; charset=utf-8",
-        },
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json; charset=utf-8" },
         body: JSON.stringify(params),
       })
-    : await fetch(`https://slack.com/api/${method}?${query}`, {
-        headers: { authorization: `Bearer ${token}` },
-      });
+    : await fetchApi("Slack", `https://slack.com/api/${method}?${query}`, { headers: { authorization: `Bearer ${token}` } });
   if (response.status === 401) throw new ConnectorAuthError("slack");
+  // Slack's edge can answer with HTML (502s, maintenance pages); only its API speaks JSON.
+  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
+    throw upstreamError("Slack", response, method);
+  }
   const body = (await response.json()) as { ok: boolean; error?: string } & T;
   if (!body.ok) {
-    if (body.error === "invalid_auth" || body.error === "token_revoked") {
+    if (body.error === "invalid_auth" || body.error === "token_revoked" || body.error === "account_inactive") {
       throw new ConnectorAuthError("slack");
     }
-    throw new Error(`Slack ${method} failed: ${body.error}`);
+    if (body.error === "ratelimited") throw new UpstreamError("Slack", 503, `Slack is rate-limiting ${method}. Try again in a minute.`);
+    throw new UpstreamError("Slack", 502, `Slack ${method} failed: ${body.error ?? "unknown error"}.`);
   }
   return body;
-}
-
-export class ConnectorAuthError extends Error {
-  constructor(readonly connector: string) {
-    super(`${connector} authorization expired or was revoked`);
-  }
 }
 
 interface SlackMessage {
@@ -74,15 +71,23 @@ export async function searchMessages(
   return { total: body.messages.total, messages: body.messages.matches.map(toMessage) };
 }
 
-export async function listChannels(token: string, { limit = 200 }: { limit?: number } = {}) {
-  const body = await slack<{
-    channels: { id: string; name: string; is_private: boolean; num_members?: number; topic?: { value: string } }[];
-  }>(token, "conversations.list", {
-    limit,
-    exclude_archived: true,
-    types: "public_channel,private_channel,mpim,im",
-  });
-  return body.channels.map((c) => ({
+type SlackChannel = { id: string; name: string; is_private: boolean; num_members?: number; topic?: { value: string } };
+
+/** Every channel, group DM and DM the user is in, following Slack's pages (up to 1,000). */
+export async function listChannels(token: string) {
+  const channels: SlackChannel[] = [];
+  let cursor: string | undefined;
+  do {
+    const body = await slack<{ channels: SlackChannel[]; response_metadata?: { next_cursor?: string } }>(token, "conversations.list", {
+      limit: 200,
+      cursor,
+      exclude_archived: true,
+      types: "public_channel,private_channel,mpim,im",
+    });
+    channels.push(...body.channels);
+    cursor = body.response_metadata?.next_cursor || undefined;
+  } while (cursor && channels.length < 1000);
+  return channels.map((c) => ({
     id: c.id,
     name: c.name,
     private: c.is_private,

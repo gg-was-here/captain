@@ -9,7 +9,7 @@
  *     v<n>/source/…      source, kept so the app can be edited and re-built
  */
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app } from "electron";
@@ -26,6 +26,8 @@ export interface AppManifest {
 interface AppBundle extends AppManifest {
   dist: Record<string, string>;
   source: Record<string, string>;
+  /** Binary source files, path → base64 (bundles made before it existed don't have it). */
+  assets?: Record<string, string>;
 }
 
 export type AppRecord = { id: string; createdAt: string; updatedAt: string; [field: string]: unknown };
@@ -62,24 +64,43 @@ export function isInstalled(appId: string, version: number) {
   return existsSync(join(appDir(appId), `v${version}`, "dist", "index.html"));
 }
 
-/** Write a downloaded bundle to disk and make it the active version. */
-export async function installBundle(bundle: AppBundle) {
-  const versionDir = join(appDir(bundle.appId), `v${bundle.version}`);
+const installs = new Map<string, Promise<void>>();
+
+/**
+ * Write a downloaded bundle to disk and make it the active version. Installs of one app run one at a
+ * time, and each version is written to a staging folder and moved into place, so a crash or a full disk
+ * never leaves a half-installed version that looks complete.
+ */
+export function installBundle(bundle: AppBundle, expected: { appId: string; version: number }): Promise<void> {
+  if (bundle.appId !== expected.appId || bundle.version !== expected.version) {
+    return Promise.reject(new Error("The download was for a different app version."));
+  }
+  const previous = installs.get(bundle.appId) ?? Promise.resolve();
+  const install = previous.catch(() => {}).then(() => writeBundle(bundle));
+  installs.set(bundle.appId, install);
+  return install;
+}
+
+async function writeBundle(bundle: AppBundle) {
+  const root = appDir(bundle.appId);
+  const versionDir = join(root, `v${bundle.version}`);
+  const staging = join(root, `.installing-v${bundle.version}`);
+  await rm(staging, { recursive: true, force: true });
+  const write = async (folder: string, path: string, content: Buffer | string) => {
+    const file = normalize(join(staging, folder, path));
+    if (!file.startsWith(staging + sep)) return;
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, content);
+  };
+  for (const [path, base64] of Object.entries(bundle.dist)) await write("dist", path, Buffer.from(base64, "base64"));
+  for (const [path, text] of Object.entries(bundle.source)) await write("source", path, text);
+  for (const [path, base64] of Object.entries(bundle.assets ?? {})) await write("source", path, Buffer.from(base64, "base64"));
   await rm(versionDir, { recursive: true, force: true });
-  for (const [path, base64] of Object.entries(bundle.dist)) {
-    const file = normalize(join(versionDir, "dist", path));
-    if (!file.startsWith(versionDir + sep)) continue;
-    await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, Buffer.from(base64, "base64"));
-  }
-  for (const [path, text] of Object.entries(bundle.source)) {
-    const file = normalize(join(versionDir, "source", path));
-    if (!file.startsWith(versionDir + sep)) continue;
-    await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, text);
-  }
-  const { dist: _d, source: _s, ...manifest } = bundle;
-  await writeFile(join(appDir(bundle.appId), "manifest.json"), JSON.stringify(manifest, null, 2));
+  await rename(staging, versionDir);
+  const { dist: _d, source: _s, assets: _a, ...manifest } = bundle;
+  const manifestPath = join(root, "manifest.json");
+  await writeFile(`${manifestPath}.tmp`, JSON.stringify(manifest, null, 2));
+  await rename(`${manifestPath}.tmp`, manifestPath);
   await pruneOldVersions(bundle.appId, bundle.version);
 }
 
