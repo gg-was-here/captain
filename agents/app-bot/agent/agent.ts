@@ -10,4 +10,8 @@ export default defineAgent({
   // eve's optional defaults include web_fetch, bash and agent with no approval, which prompt injection
   // in a Slack message or email could use to send data out. Only the tools in agent/tools are added.
   defaultTools: false,
+  // Chats last until the user deletes them: no 30-day session timeout. A session's stored conversation is
+  // deleted when it ends (thread or account deletion resets it), not kept for a retention period.
+  limits: { sessionTimeoutMs: false },
+  experimental: { workflow: { retention: 0 } },
 });

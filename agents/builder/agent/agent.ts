@@ -10,4 +10,7 @@ export default defineAgent({
   // eve's optional defaults include web_fetch, bash and agent with no approval, which prompt injection
   // in a Slack message or email could use to send data out. Only the tools in agent/tools are added.
   defaultTools: false,
+  // Builder sessions keep eve's 30-day timeout (a later "Edit app" reopens the app with open_app). Their
+  // stored conversation is deleted when the session ends rather than kept for a retention period.
+  experimental: { workflow: { retention: 0 } },
 });

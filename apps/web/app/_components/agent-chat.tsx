@@ -74,11 +74,15 @@ export function AgentChat({
 }) {
   const AGENT_NAME = bot.name;
   const [cancellationError, setCancellationError] = useState<string>();
+  const [saveError, setSaveError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
   const hasSubmittedMessage = useRef(false);
   const threadId = useRef(initialThreadId);
   const firstMessage = useRef<string>("");
-  const creatingThread = useRef<Promise<void> | undefined>(undefined);
+  /** The thread's save in flight, if any. */
+  const saving = useRef<Promise<void> | undefined>(undefined);
+  /** The session the saved thread points at. A new one (the first message, or after the old session ended) is saved. */
+  const savedSessionId = useRef(sessionId);
   const currentSessionId = useRef(sessionId);
 
   const savePreview = (preview: string) => {
@@ -90,42 +94,52 @@ export function AgentChat({
     }).then(refreshSidebar);
   };
 
-  /** Persist the thread the first time eve hands us a session id, then move the URL to it. */
+  /**
+   * Save the thread with its session the first time eve hands us a session id, and save the new id when
+   * the thread continues in a new session. A failed save is retried with the next message.
+   */
   const ensureThread = (nextSessionId: string) => {
-    if (creatingThread.current) return;
-    if (threadId.current) {
-      // Threads created from the + menu exist before their session; attach it on the first message.
-      if (sessionId === undefined) {
-        creatingThread.current = fetch(`/api/threads/${threadId.current}`, {
+    if (savedSessionId.current === nextSessionId || saving.current) return;
+    // Threads created from the + menu exist before their session.
+    const request = threadId.current
+      ? fetch(`/api/threads/${threadId.current}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ sessionId: nextSessionId }),
-        }).then(() => {
-          refreshSidebar();
+        })
+      : fetch("/api/threads", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            agent: bot.agent,
+            sessionId: nextSessionId,
+            title: title || firstMessage.current.slice(0, 80) || bot.name,
+            preview: latestText.current.slice(0, 200),
+            instructions: instructions?.trim() || undefined,
+            appId,
+          }),
         });
-      }
-      return;
-    }
-    creatingThread.current = fetch("/api/threads", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        agent: bot.agent,
-        sessionId: nextSessionId,
-        title: title || firstMessage.current.slice(0, 80) || bot.name,
-        preview: latestText.current.slice(0, 200),
-        instructions: instructions?.trim() || undefined,
-        appId,
-      }),
-    })
-      .then((r) => r.json())
-      .then(({ thread }) => {
-        threadId.current = thread.id;
-        onThreadCreated?.(thread.id);
-        // Framework routers patch window.history; navigating through them would
-        // remount this route and detach the active stream.
-        History.prototype.replaceState.call(window.history, window.history.state, "", `/t/${thread.id}`);
+    saving.current = request
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+        savedSessionId.current = nextSessionId;
+        setSaveError(undefined);
+        if (!threadId.current) {
+          threadId.current = body.thread.id;
+          onThreadCreated?.(body.thread.id);
+          // Framework routers patch window.history; navigating through them would
+          // remount this route and detach the active stream.
+          History.prototype.replaceState.call(window.history, window.history.state, "", `/t/${body.thread.id}`);
+        }
         refreshSidebar();
+      })
+      .catch((error: unknown) => {
+        console.error("[chat] couldn't save the thread", error);
+        setSaveError("This chat isn't saved to your sidebar yet. Bambii will try again with your next message.");
+      })
+      .finally(() => {
+        saving.current = undefined;
       });
   };
   const agent = useEveAgent({
@@ -174,7 +188,7 @@ export function AgentChat({
       if (announced.current.has(key)) return;
       announced.current.add(key);
       onAppBuilt?.(built);
-      void (creatingThread.current ?? Promise.resolve()).then(() => {
+      void (saving.current ?? Promise.resolve()).then(() => {
         if (!threadId.current) return;
         void fetch(`/api/threads/${threadId.current}`, {
           method: "PATCH",
@@ -248,8 +262,15 @@ export function AgentChat({
     lastMessage?.role === "assistant" && !showPendingThinking ? activityOf(lastMessage) : "Thinking";
   const showLoader = isBusy && !awaitingUser && activity !== undefined;
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
-  const errorMessage = cancellationError ?? explainSendError(agent.error?.message, sessionId) ?? turnFailure;
-  const hasConversationContent = !isEmpty || errorMessage !== undefined;
+  const sessionEnded = hasSessionEnded(agent.error);
+  const errorMessage = sessionEnded
+    ? undefined
+    : (cancellationError ?? saveError ?? explainSendError(agent.error?.message, sessionId) ?? turnFailure);
+  // Token-limit prompts (Continue or Stop) aren't tied to a tool call, so they're shown on their own.
+  const sessionLimitPrompts = Object.values(agent.data.inputs).filter(
+    (input) => input.status === "open" && input.request.kind === "session-limit",
+  );
+  const hasConversationContent = !isEmpty || errorMessage !== undefined || sessionEnded;
   // A saved thread always opens as a chat: its name on top, the composer at the bottom.
   const showConversationLayout = isResuming || hasConversationContent || initialThreadId !== undefined;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
@@ -386,7 +407,16 @@ export function AgentChat({
             {delegated.map((app) => (
               <AppReadyCard key={app.appId} output={{ ok: true, ...app }} />
             ))}
+            {sessionLimitPrompts.map(({ request }) => (
+              <SessionLimitPrompt
+                key={request.requestId}
+                options={request.options ?? []}
+                prompt={request.prompt}
+                onChoose={(optionId) => void agent.respond([{ optionId, requestId: request.requestId }])}
+              />
+            ))}
             {showLoader ? <PendingThinking icon={bot.icon} label={activity} /> : null}
+            {sessionEnded ? <SessionEnded onRestart={() => agent.reset()} /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
           <ConversationScrollButton />
@@ -479,6 +509,71 @@ function explainSendError(message: string | undefined, savedSessionId: string | 
   if (process.env.NODE_ENV !== "development" || savedSessionId === undefined) return message;
   if (message !== "Failed to send the session message.") return message;
   return "This chat can't continue: it started before the local dev server last restarted, and eve dev doesn't resume older chats. Start a new chat to keep going.";
+}
+
+/** eve error codes for a session that can no longer take messages. */
+const ENDED_SESSION_CODES = new Set(["session_expired", "session_not_active", "session_stranded"]);
+
+function hasSessionEnded(error: Error | undefined): boolean {
+  if (!error) return false;
+  const code = (error as Error & { code?: string }).code;
+  return (code !== undefined && ENDED_SESSION_CODES.has(code)) || error.name === "ClientSessionStrandedError";
+}
+
+/** A session that ended (Builder's 30-day limit, or a reset) can't continue; the thread carries on in a new one. */
+function SessionEnded({ onRestart }: { readonly onRestart: () => void }) {
+  return (
+    <Message className="max-w-full" from="assistant">
+      <MessageContent>
+        <div className="flex w-full flex-col gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm" role="status">
+          <p className="font-medium">This chat's session has ended</p>
+          <p className="text-muted-foreground">Its earlier messages are no longer available. Start a new session to keep going in this chat.</p>
+          <div>
+            <button
+              className="rounded-full border bg-background px-3 py-1 text-xs font-medium hover:bg-accent"
+              onClick={onRestart}
+              type="button"
+            >
+              Start a new session
+            </button>
+          </div>
+        </div>
+      </MessageContent>
+    </Message>
+  );
+}
+
+/** eve's prompt when a session reaches its token budget: continue with a fresh budget, or stop. */
+function SessionLimitPrompt({
+  prompt,
+  options,
+  onChoose,
+}: {
+  readonly prompt: string;
+  readonly options: readonly { readonly id: string; readonly label: string }[];
+  readonly onChoose: (optionId: string) => void;
+}) {
+  return (
+    <Message className="max-w-full" from="assistant">
+      <MessageContent>
+        <div className="flex w-full flex-col gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-3 py-2.5 text-sm">
+          <p className="whitespace-pre-wrap">{prompt}</p>
+          <div className="flex flex-wrap gap-2">
+            {options.map((option) => (
+              <button
+                className="rounded-full border bg-background px-3 py-1 text-xs font-medium hover:bg-accent"
+                key={option.id}
+                onClick={() => onChoose(option.id)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </MessageContent>
+    </Message>
+  );
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {
