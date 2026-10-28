@@ -1,9 +1,10 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { signInWithBrowser } from "./auth";
-import { registerAppScheme, SpaceManager } from "./space";
+import { registerAppBridge, registerAppScheme, SpaceManager } from "./space";
 import * as store from "./store";
+import { deepLinkPath, isExternalUrl, mayShowInWindow } from "./urls";
 
 /**
  * The Captain web app this shell wraps: `captainUrl` in package.json for
@@ -19,6 +20,8 @@ app.setAsDefaultProtocolClient("captain");
 
 let mainWindow: BrowserWindow | undefined;
 let space: SpaceManager | undefined;
+/** A deep link that launched the app: it arrives before the app is ready for a window. */
+let launchPath: string | undefined;
 
 function isCaptainUrl(url: string) {
   try {
@@ -28,7 +31,11 @@ function isCaptainUrl(url: string) {
   }
 }
 
-function createWindow() {
+function openExternal(url: string) {
+  if (isExternalUrl(url)) void shell.openExternal(url);
+}
+
+function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -44,19 +51,32 @@ function createWindow() {
       sandbox: true,
     },
   });
+  mainWindow = window;
 
   // Google and some OAuth providers refuse embedded browsers that advertise Electron.
   const ua = window.webContents.getUserAgent().replace(/\s(Electron|Captain|Bambii)\/\S+/g, "");
   window.webContents.setUserAgent(ua);
 
-  // Links to other sites open in the default browser, except OAuth flows started by Captain.
+  // Links to other sites open in the default browser.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    openExternal(url);
     return { action: "deny" };
+  });
+  // The window has no address bar, so it only shows Bambii and its sign-in pages; anything else opens in
+  // the browser, where the user can see where they are.
+  window.webContents.on("will-navigate", (event) => {
+    if (mayShowInWindow(event.url, ORIGIN)) return;
+    event.preventDefault();
+    openExternal(event.url);
+  });
+  window.webContents.on("will-redirect", (event) => {
+    if (!event.isMainFrame || mayShowInWindow(event.url, ORIGIN)) return;
+    event.preventDefault();
+    openExternal(event.url);
   });
 
   window.once("ready-to-show", () => window.show());
-  void window.loadURL(`${ORIGIN}${process.env.CAPTAIN_START_PATH ?? "/"}`);
+  void window.loadURL(`${ORIGIN}${startPath}`);
 
   space = new SpaceManager(window, ORIGIN);
   window.webContents.on("did-start-navigation", (_e, url, _inPlace, isMainFrame) => {
@@ -64,9 +84,31 @@ function createWindow() {
     if (isMainFrame && !isCaptainUrl(url)) space?.close();
   });
   window.on("closed", () => {
+    if (mainWindow !== window) return;
     mainWindow = undefined;
+    space = undefined;
   });
-  mainWindow = window;
+}
+
+function showThread(path: string) {
+  if (!mainWindow) return createWindow(path);
+  void mainWindow.loadURL(`${ORIGIN}${path}`);
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/** The browser features the web UI uses (dictation and copy buttons), for Bambii's own pages only. */
+const WEB_PERMISSIONS = new Set(["media", "clipboard-sanitized-write"]);
+
+function restrictPermissions() {
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    const audioOnly = !("mediaTypes" in details) || !details.mediaTypes?.includes("video");
+    callback(WEB_PERMISSIONS.has(permission) && audioOnly && isCaptainUrl(details.requestingUrl));
+  });
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, requestingOrigin) => WEB_PERMISSIONS.has(permission) && requestingOrigin === ORIGIN,
+  );
 }
 
 /** Only the Captain web UI (not third-party pages during OAuth) may use the desktop bridge. */
@@ -121,17 +163,21 @@ ipcMain.on("apps:reveal", (event, appId: string) => {
   if (!isFromCaptain(event)) return;
   shell.showItemInFolder(join(store.appDir(appId), "manifest.json"));
 });
+// Built apps' window.captain calls, answered by whichever Space is open. Registered once: a second
+// registration throws, which broke the bridge when the window was reopened from the Dock.
+registerAppBridge(() => space);
 
 // captain://t/<threadId> deep links (e.g. from notifications or the website).
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  const target = new URL(url);
-  const path = `/${target.host}${target.pathname}`.replace(/\/+$/, "");
-  if (!mainWindow) createWindow();
-  void mainWindow?.loadURL(`${ORIGIN}${path}${target.search}`);
+  const path = deepLinkPath(url);
+  if (!path) return;
+  if (app.isReady()) showThread(path);
+  else launchPath = path;
 });
 
 app.whenReady().then(() => {
+  restrictPermissions();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       { role: "appMenu" },
@@ -143,8 +189,10 @@ app.whenReady().then(() => {
       { role: "windowMenu" },
     ]),
   );
-  createWindow();
-  if (app.isPackaged) void autoUpdater.checkForUpdatesAndNotify();
+  createWindow(launchPath);
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch((error: unknown) => console.error("[updater] update check failed", error));
+  }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

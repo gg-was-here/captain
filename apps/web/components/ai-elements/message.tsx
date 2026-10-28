@@ -9,7 +9,7 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, ImageIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -276,10 +276,47 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
+/**
+ * Markdown images load as soon as they render, so a prompt injected through a message, email or web page
+ * could make a reply leak data in an image URL with no click. Only this site's own images (and inline
+ * data) load by themselves; any other image waits for the user to choose to load it.
+ */
+export function SafeImage({ src, alt, node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) {
+  const [load, setLoad] = useState(false);
+  if (typeof src !== "string" || src === "") return null;
+  let url: URL;
+  try {
+    url = new URL(src, typeof window === "undefined" ? "https://localhost" : window.location.href);
+  } catch {
+    return null;
+  }
+  const local =
+    url.protocol === "data:" || url.protocol === "blob:" || (typeof window !== "undefined" && url.origin === window.location.origin);
+  if (local || load) {
+    return <img alt={alt ?? ""} src={src} {...props} />;
+  }
+  return (
+    <button
+      className="my-1 inline-flex max-w-full items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-muted-foreground text-xs hover:bg-muted"
+      onClick={() => setLoad(true)}
+      title={src}
+      type="button"
+    >
+      <ImageIcon className="size-3.5 shrink-0" />
+      <span className="truncate">
+        {alt ? `${alt} · ` : ""}Load image from {url.hostname}
+      </span>
+    </button>
+  );
+}
+
+const streamdownComponents = { img: SafeImage };
+
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0", className)}
+      components={streamdownComponents}
       plugins={streamdownPlugins}
       {...props}
     />

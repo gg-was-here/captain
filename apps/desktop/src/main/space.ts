@@ -2,11 +2,13 @@
  * The Space: a native view beside the chat that runs one built app from disk.
  *
  * Each app runs in its own session partition under the `captain-app://<appId>/`
- * origin, with no network access of its own (CSP `connect-src 'none'`). Its only
- * way out is the `window.captain` bridge (preload/space.ts), whose requests are
- * handled here: data goes to the app's SQLite file, and AI and connector calls
- * are proxied to the Captain backend with the signed-in user's session, limited
- * to the connectors the user approved for that app.
+ * origin, with no network access of its own: its CSP blocks requests, remote
+ * images and form posts, and its session routes everything else (such as WebRTC)
+ * to a proxy that doesn't exist. Its only way out is the `window.captain` bridge
+ * (preload/space.ts), whose requests are handled here: data goes to the app's
+ * SQLite file, and AI and connector calls are proxied to the Captain backend with
+ * the signed-in user's session, limited to the connectors the user approved for
+ * that app. Links the app opens go to the browser only after the user agrees.
  */
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -29,9 +31,14 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
+  // No remote images: an image URL can carry the app's data to any server.
+  "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+  "object-src 'none'",
+  "frame-src 'none'",
 ].join("; ");
 
 const MIME: Record<string, string> = {
@@ -70,8 +77,12 @@ function appSession(appId: string) {
         return new Response("Not found", { status: 404 });
       }
     });
-    // Apps never get camera, mic, notifications, etc.
-    ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    // Apps never get camera, mic, notifications, etc. Copy buttons may write to the clipboard.
+    ses.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === "clipboard-sanitized-write"));
+    ses.setPermissionCheckHandler((_wc, permission) => permission === "clipboard-sanitized-write");
+    // CSP can't stop WebRTC. Route the session's traffic, loopback included, to a proxy that doesn't exist;
+    // app views also limit WebRTC to that proxy (see `open`).
+    void ses.setProxy({ proxyRules: "http://127.0.0.1:9", proxyBypassRules: "<-loopback>" });
     partitionsWithProtocol.add(partition);
   }
   return ses;
@@ -93,9 +104,7 @@ export class SpaceManager {
   constructor(
     private readonly window: BrowserWindow,
     private readonly origin: string,
-  ) {
-    this.registerAppBridge();
-  }
+  ) {}
 
   /** fetch() against the Captain backend as the signed-in user (main window cookies). */
   private backend(path: string, init: RequestInit = {}) {
@@ -125,8 +134,9 @@ export class SpaceManager {
         additionalArguments: [`--captain-app=${JSON.stringify({ id: appId, name: manifest.name, version })}`],
       },
     });
+    view.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     view.webContents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith("https://")) void shell.openExternal(url);
+      void this.confirmExternal(manifest.name, url);
       return { action: "deny" };
     });
     view.webContents.on("will-navigate", (event, url) => {
@@ -187,40 +197,33 @@ export class SpaceManager {
     await store.approveConnectors(manifest.appId, response === 0 ? manifest.connectors : approved);
   }
 
-  /** IPC from app views. The app id comes from which view sent it — never from the message. */
-  private registerAppBridge() {
-    const appFor = (sender: Electron.WebContents) => {
-      if (!this.view || sender !== this.view.webContents || !this.appId) throw new Error("Not a Captain app");
-      return this.appId;
-    };
-
-    ipcMain.handle("app:db:list", (e, collection: string) => store.listRecords(appFor(e.sender), collection));
-    ipcMain.handle("app:db:put", (e, collection: string, record: Record<string, unknown>) =>
-      store.putRecord(appFor(e.sender), collection, record),
-    );
-    ipcMain.handle("app:db:remove", (e, collection: string, id: string) =>
-      store.removeRecord(appFor(e.sender), collection, id),
-    );
-
-    ipcMain.handle("app:ai:generate", async (e, request: { prompt: string; system?: string; json?: boolean }) => {
-      const appId = appFor(e.sender);
-      return this.runtimeCall("ai", { appId, ...request });
-    });
-
-    ipcMain.handle(
-      "app:connectors:call",
-      async (e, connector: string, action: string, input: Record<string, unknown>) => {
-        const appId = appFor(e.sender);
-        if (!(await store.approvedConnectors(appId)).includes(connector)) {
-          throw new Error(`This app isn't allowed to use ${connector}. Re-open it to grant access.`);
-        }
-        const body = await this.runtimeCall("connectors", { appId, connector, action, input });
-        return body.result;
-      },
-    );
+  /** The app shown in `sender` when it is this Space's view. The app id never comes from the message. */
+  appIdFor(sender: Electron.WebContents): string {
+    if (!this.view || sender !== this.view.webContents || !this.appId) throw new Error("Not a Captain app");
+    return this.appId;
   }
 
-  private async runtimeCall(kind: "ai" | "connectors", body: Record<string, unknown>, confirmed = false): Promise<any> {
+  /** Apps leave the Space only through the user: a link an app opens shows its full address first. */
+  private async confirmExternal(appName: string, url: string) {
+    let target: URL;
+    try {
+      target = new URL(url);
+    } catch {
+      return;
+    }
+    if (target.protocol !== "https:" && target.protocol !== "http:") return;
+    const { response } = await dialog.showMessageBox(this.window, {
+      type: "question",
+      buttons: ["Open", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+      message: `“${appName}” wants to open ${target.hostname} in your browser.`,
+      detail: url.length > 600 ? `${url.slice(0, 600)}…` : url,
+    });
+    if (response === 0) await shell.openExternal(url);
+  }
+
+  async runtimeCall(kind: "ai" | "connectors", body: Record<string, unknown>, confirmed = false): Promise<any> {
     const response = await this.backend(`/api/runtime/${kind}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(confirmed ? { "x-captain-confirmed": "1" } : {}) },
@@ -242,6 +245,40 @@ export class SpaceManager {
     if (!response.ok) throw new Error(json.error ?? `Request failed (${response.status})`);
     return json;
   }
+}
+
+/**
+ * IPC from app views, registered once for the life of the process (a second registration throws) and
+ * answered by the Space that is open.
+ */
+export function registerAppBridge(current: () => SpaceManager | undefined) {
+  const appFor = (sender: Electron.WebContents) => {
+    const space = current();
+    if (!space) throw new Error("Not a Captain app");
+    return { space, appId: space.appIdFor(sender) };
+  };
+
+  ipcMain.handle("app:db:list", (e, collection: string) => store.listRecords(appFor(e.sender).appId, collection));
+  ipcMain.handle("app:db:put", (e, collection: string, record: Record<string, unknown>) =>
+    store.putRecord(appFor(e.sender).appId, collection, record),
+  );
+  ipcMain.handle("app:db:remove", (e, collection: string, id: string) =>
+    store.removeRecord(appFor(e.sender).appId, collection, id),
+  );
+
+  ipcMain.handle("app:ai:generate", async (e, request: { prompt?: unknown; system?: unknown; json?: unknown }) => {
+    const { space, appId } = appFor(e.sender);
+    return space.runtimeCall("ai", { prompt: request?.prompt, system: request?.system, json: request?.json, appId });
+  });
+
+  ipcMain.handle("app:connectors:call", async (e, connector: string, action: string, input: Record<string, unknown>) => {
+    const { space, appId } = appFor(e.sender);
+    if (!(await store.approvedConnectors(appId)).includes(connector)) {
+      throw new Error(`This app isn't allowed to use ${connector}. Re-open it to grant access.`);
+    }
+    const body = await space.runtimeCall("connectors", { connector, action, input, appId });
+    return body.result;
+  });
 }
 
 /** Dev aid: `CAPTAIN_DEBUG_CAPTURE=<dir>` saves screenshots of the window and Space after an app opens. */
