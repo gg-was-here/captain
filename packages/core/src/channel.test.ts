@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sessionIdOf, trustedForwarders } from "./channel";
+import { isCrossSiteWrite, sessionIdOf, trustedForwarders } from "./channel";
 
 type Forwarder = Parameters<typeof trustedForwarders>[0];
 type Assertion = Parameters<typeof trustedForwarders>[1];
@@ -53,5 +53,27 @@ describe("trustedForwarders", () => {
     expect(trustedForwarders(local, assertion("local"))).toBe(true);
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_x");
     expect(trustedForwarders(local, assertion("local"))).toBe(false);
+  });
+});
+
+describe("isCrossSiteWrite", () => {
+  const post = (headers: Record<string, string>) =>
+    new Request("https://bambii.ai/eve/captain/v1/session", { method: "POST", headers });
+
+  it("allows Bambii's own requests", () => {
+    expect(isCrossSiteWrite(post({ "sec-fetch-site": "same-origin", "content-type": "application/json" }))).toBe(false);
+    // A prewarm has no body and no content type.
+    expect(isCrossSiteWrite(post({ "sec-fetch-site": "same-origin" }))).toBe(false);
+    expect(isCrossSiteWrite(new Request("https://bambii.ai/eve/captain/v1/session/s_1/stream"))).toBe(false);
+  });
+
+  it("refuses cross-site requests and form-style bodies", () => {
+    expect(isCrossSiteWrite(post({ "sec-fetch-site": "cross-site", "content-type": "application/json" }))).toBe(true);
+    expect(isCrossSiteWrite(post({ "content-type": "text/plain" }))).toBe(true);
+    expect(isCrossSiteWrite(post({ "content-type": "application/x-www-form-urlencoded" }))).toBe(true);
+  });
+
+  it("leaves bearer callers alone", () => {
+    expect(isCrossSiteWrite(post({ authorization: "Bearer x", "content-type": "text/plain" }))).toBe(false);
   });
 });

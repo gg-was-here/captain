@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
 const templateDir = join(root, "packages/app-template");
-const skip = new Set(["node_modules", "dist", "package-lock.json"]);
+const skip = new Set(["node_modules", "dist"]);
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {

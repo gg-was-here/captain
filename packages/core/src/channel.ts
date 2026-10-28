@@ -20,6 +20,19 @@ export function sessionIdOf(request: Request): string | undefined {
 /** The bot a request is for, from its `/eve/<agent>/v1/...` path. */
 const agentOf = (request: Request) => new URL(request.url).pathname.match(/\/eve\/([^/]+)\/v1\//)?.[1];
 
+/**
+ * Cookie-authenticated writes must come from Bambii's own pages. Browsers attach cookies to some
+ * cross-site requests (for example from a page that frames Bambii), and eve parses the body as JSON
+ * whatever its declared type, so refuse cross-site requests and non-JSON bodies. A bodyless POST (a
+ * prewarm) has no content type. Bearer callers (other bots) aren't affected.
+ */
+export function isCrossSiteWrite(request: Request): boolean {
+  if (request.method === "GET" || request.method === "HEAD" || request.headers.has("authorization")) return false;
+  if (request.headers.get("sec-fetch-site") === "cross-site") return true;
+  const type = request.headers.get("content-type");
+  return type !== null && !type.toLowerCase().startsWith("application/json");
+}
+
 /** Session create/follow-up requests that carry a user message (not prewarm, approvals or stream reads). */
 async function sendsMessage(request: Request) {
   if (request.method !== "POST" || !/\/v1\/session(\/[^/]+)?$/.test(new URL(request.url).pathname)) return false;
@@ -39,6 +52,7 @@ function captainUserAuth(): AuthFn<Request> {
   return async (request) => {
     const result = await auth(request);
     if (!result) return null;
+    if (isCrossSiteWrite(request)) throw new ForbiddenError({ message: "Requests from other sites aren't allowed." });
     // The compiled agent configuration (tools, instructions) is for operators, not users.
     if (clerkConfigured() && request.method === "GET" && /\/v1\/info$/.test(new URL(request.url).pathname)) {
       throw new ForbiddenError({ message: "Not available." });

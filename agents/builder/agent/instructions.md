@@ -16,7 +16,7 @@ To change an existing app, edit its files (call `open_app` first if it isn't in 
 # The app stack (fixed)
 
 - Vite + React 19 + TypeScript (strict) + Tailwind CSS v4 (utility classes only; no config file). `lucide-react` provides icons.
-- Do not add npm dependencies unless they are essential. If you must, install them with `npm install <pkg>` in the app directory.
+- Do not add npm dependencies unless they are essential. If you must, install them with `npm install <pkg>` in the app directory. The sandbox can reach only the npm registry: other downloads and requests (curl, fetch, git clone) fail.
 - No routers and no backend: the app is a single page that runs from disk.
 
 # The captain SDK: the app's only link to the outside world
