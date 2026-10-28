@@ -1,4 +1,4 @@
-import { deleteBundles } from "@captain/core/bundles";
+import { deleteAppBundles } from "@captain/core/bundles";
 import { getDb, schema } from "@captain/core/db";
 import { and, eq } from "drizzle-orm";
 import { findBuildThread, requireApp } from "@/lib/server/data";
@@ -17,11 +17,11 @@ export const DELETE = route(async (request: Request, { params }: Params) => {
   const user = await requireUser(request);
   const app = await requireApp(user.id, (await params).id);
   const db = await getDb();
-  const versions = await db
-    .delete(schema.appVersions)
-    .where(eq(schema.appVersions.appId, app.id))
-    .returning({ bundleKey: schema.appVersions.bundleKey });
-  await db.delete(schema.apps).where(and(eq(schema.apps.id, app.id), eq(schema.apps.userId, user.id)));
-  await deleteBundles(versions.map((v) => v.bundleKey));
+  await db.batch([
+    db.delete(schema.appVersions).where(eq(schema.appVersions.appId, app.id)),
+    db.delete(schema.apps).where(and(eq(schema.apps.id, app.id), eq(schema.apps.userId, user.id))),
+  ]);
+  // The app is gone either way; bundles left by a storage error are logged, not reported as a failed delete.
+  await deleteAppBundles(app.id).catch((error: unknown) => console.error("[apps] couldn't delete bundles", app.id, error));
   return new Response(null, { status: 204 });
 });

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { del, get, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 import { localDataDir } from "./db-url";
 
 /**
@@ -46,13 +46,21 @@ export async function saveBundle(bundle: AppBundle): Promise<string> {
   return key;
 }
 
-export async function deleteBundles(keys: string[]): Promise<void> {
-  if (keys.length === 0) return;
-  if (useBlob()) {
-    await del(keys);
-  } else {
-    await Promise.all(keys.map((key) => rm(join(localDataDir(), "bundles", key), { force: true })));
+/**
+ * Deletes every stored version of an app. Lists by prefix rather than trusting database rows, so a retry
+ * after a half-finished deletion still finds what's left.
+ */
+export async function deleteAppBundles(appId: string): Promise<void> {
+  if (!useBlob()) {
+    await rm(join(localDataDir(), "bundles", "apps", appId), { recursive: true, force: true });
+    return;
   }
+  let cursor: string | undefined;
+  do {
+    const page = await list({ prefix: `apps/${appId}/`, cursor });
+    if (page.blobs.length > 0) await del(page.blobs.map((blob) => blob.url));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
 }
 
 /** The bundle stored under `key`, or null if there is none. Storage failures throw, so they aren't mistaken for "not built". */
