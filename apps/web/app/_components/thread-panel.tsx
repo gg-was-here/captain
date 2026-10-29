@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useDesktop } from "@/lib/client/desktop";
 import { COMPACT_QUERY, useIsMobile, useMediaQuery } from "@/lib/client/use-mobile";
 import { avatarColor, cn, roundButton } from "@/lib/utils";
@@ -241,15 +242,20 @@ function ContextPane({
           />
           <div className="flex items-center justify-end gap-3">
             <span className="text-muted-foreground text-xs">
-              {status === "saving"
-                ? "Saving…"
-                : status === "saved"
-                  ? threadId
-                    ? "Saved"
-                    : "Saved with your first message"
-                  : status === "error"
-                    ? "Couldn't save. Try again."
-                    : null}
+              {status === "saving" ? (
+                <span className="flex items-center gap-1.5">
+                  <Spinner className="size-3" />
+                  Saving…
+                </span>
+              ) : status === "saved" ? (
+                threadId ? (
+                  "Saved"
+                ) : (
+                  "Saved with your first message"
+                )
+              ) : status === "error" ? (
+                "Couldn't save. Try again."
+              ) : null}
             </span>
             <Button
               className="rounded-full"

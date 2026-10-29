@@ -1,8 +1,9 @@
 "use client";
 
-import { SignIn, SignUp } from "@clerk/nextjs";
+import { ClerkLoaded, ClerkLoading, SignIn, SignUp } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { type CaptainDesktop, desktopErrorText, getDesktop } from "@/lib/client/desktop";
 
 /**
@@ -16,8 +17,17 @@ export function SignInOrDesktop({ mode = "sign-in" }: { readonly mode?: "sign-in
 
   useEffect(() => setDesktop(getDesktop() ?? null), []);
 
-  if (desktop === undefined) return null;
-  if (!desktop?.signInWithBrowser) return mode === "sign-up" ? <SignUp /> : <SignIn />;
+  if (desktop === undefined) return <Loader />;
+  if (!desktop?.signInWithBrowser) {
+    return (
+      <>
+        <ClerkLoading>
+          <Loader />
+        </ClerkLoading>
+        <ClerkLoaded>{mode === "sign-up" ? <SignUp /> : <SignIn />}</ClerkLoaded>
+      </>
+    );
+  }
 
   const start = async () => {
     setError(undefined);

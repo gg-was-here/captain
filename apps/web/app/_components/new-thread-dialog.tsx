@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
 import { refreshSidebar } from "@/lib/client/events";
 
@@ -159,6 +160,7 @@ export function NewThreadDialog({
               Cancel
             </Button>
             <Button className="rounded-full" disabled={!trimmed || creating} type="submit">
+              {creating ? <Spinner className="size-3.5" /> : null}
               Create
             </Button>
           </div>

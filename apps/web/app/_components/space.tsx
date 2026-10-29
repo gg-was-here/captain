@@ -3,6 +3,7 @@
 import type { App } from "@captain/core/schema";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { serveAppBridge } from "@/lib/client/app-bridge";
 import { desktopErrorText, useDesktop } from "@/lib/client/desktop";
 
@@ -26,6 +27,9 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
   const [error, setError] = useState<string>();
   // Bumped when the web preview's frame leaves the app, so it is replaced with a fresh one.
   const [frameKey, setFrameKey] = useState(0);
+  // Which frame has finished loading; the loader covers any other.
+  const [loadedFrame, setLoadedFrame] = useState<string>();
+  const currentFrame = `${reloadKey}:${frameKey}`;
   const [link, setLink] = useState<string>();
   // Bumped by "Try again" when the Mac app couldn't install or open the app.
   const [attempt, setAttempt] = useState(0);
@@ -72,9 +76,11 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
 
   return (
     <div className="relative size-full" ref={hostRef}>
-      {desktop === undefined ? null : desktop ? (
+      {desktop === undefined ? (
+        <Loader className="absolute inset-0" />
+      ) : desktop ? (
         state === "ready" ? null : state === "loading" ? (
-          <Placeholder>{`Installing ${app.name} on this Mac…`}</Placeholder>
+          <Loader className="absolute inset-0" label={`Installing ${app.name} on this Mac…`} />
         ) : (
           <Placeholder>
             <span className="flex flex-col items-center gap-3">
@@ -89,16 +95,18 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
         <>
           <iframe
             className="absolute inset-0 size-full bg-white"
-            key={`${reloadKey}:${frameKey}`}
+            key={currentFrame}
+            onLoad={() => setLoadedFrame(currentFrame)}
             ref={frameRef}
             sandbox="allow-scripts allow-forms allow-modals"
             src={`/a/${app.id}/?v=${app.currentVersion}`}
             title={app.name}
           />
+          {loadedFrame === currentFrame ? null : <Loader className="absolute inset-0 bg-card" label={`Opening ${app.name}…`} />}
           {link ? <OpenLink app={app.name} link={link} onDone={() => setLink(undefined)} /> : null}
         </>
       ) : (
-        <Placeholder>Builder is still working on this app…</Placeholder>
+        <Loader className="absolute inset-0" label="Builder is still working on this app…" />
       )}
     </div>
   );

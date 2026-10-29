@@ -6,6 +6,8 @@ import { PanelLeftCloseIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react"
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader } from "@/components/ui/loader";
+import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
 import { onRefreshSidebar } from "@/lib/client/events";
 import { useIsMobile } from "@/lib/client/use-mobile";
@@ -33,6 +35,8 @@ export function Sidebar() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string>();
   const [deleting, setDeleting] = useState<string>();
+  // Until the first load settles, an empty list means "not here yet", not "no chats".
+  const [loaded, setLoaded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // A failed refresh keeps the lists already shown rather than emptying them.
@@ -47,6 +51,8 @@ export function Sidebar() {
       setError(undefined);
     } catch (e) {
       setError(errorText(e, "Couldn't load your chats."));
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -182,7 +188,9 @@ export function Sidebar() {
               </button>
             </div>
           ) : null}
-          {visible.length === 0 ? (
+          {!loaded ? (
+            <Loader className="py-10" size="sm" />
+          ) : visible.length === 0 ? (
             <p className="px-3 py-6 text-center text-muted-foreground text-xs">
               {needle ? "No threads match." : "Start a chat with the + button."}
             </p>
@@ -221,13 +229,13 @@ export function Sidebar() {
                     aria-label="Delete thread"
                     className={cn(
                       "absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-destructive group-hover:block pointer-coarse:block",
-                      deleting === thread.id ? "block animate-pulse" : "hidden",
+                      deleting === thread.id ? "block" : "hidden",
                     )}
                     disabled={deleting !== undefined}
                     onClick={() => void deleteThread(thread)}
                     type="button"
                   >
-                    <Trash2Icon className="size-3.5" />
+                    {deleting === thread.id ? <Spinner className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
                   </button>
                 </div>
               );

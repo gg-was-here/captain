@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
+import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
 import { desktopErrorText, getDesktop, useDesktop } from "@/lib/client/desktop";
 
@@ -111,6 +113,7 @@ export function Connections() {
               </div>
               {c.status === "connected" ? (
                 <Button disabled={busy === c.name} onClick={() => void disconnect(c)} size="sm" variant="outline">
+                  {busy === c.name ? <Spinner className="size-3.5" /> : null}
                   Disconnect
                 </Button>
               ) : (
@@ -119,12 +122,17 @@ export function Connections() {
                   onClick={() => void connect(c.name)}
                   size="sm"
                 >
+                  {busy === c.name ? <Spinner className="size-3.5" /> : null}
                   Connect
                 </Button>
               )}
             </li>
           ))}
-          {connections === null ? <li className="p-4 text-muted-foreground text-sm">Loading…</li> : null}
+          {connections === null ? (
+            <li className="p-6">
+              <Loader size="sm" />
+            </li>
+          ) : null}
         </ul>
       </section>
       <InstalledApps />
@@ -206,7 +214,14 @@ function InstalledApps() {
                   size="sm"
                   variant={gone ? "outline" : "ghost"}
                 >
-                  {removing === app.appId ? "Removing…" : "Remove"}
+                  {removing === app.appId ? (
+                    <>
+                      <Spinner className="size-3.5" />
+                      Removing…
+                    </>
+                  ) : (
+                    "Remove"
+                  )}
                 </Button>
               ) : null}
             </li>

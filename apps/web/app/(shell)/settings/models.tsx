@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, errorText } from "@/lib/client/api";
 
@@ -95,8 +96,8 @@ export function Models() {
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <span className="text-muted-foreground text-sm">{error ? null : "Loading…"}</span>
+            ) : error ? null : (
+              <Loader size="sm" />
             )}
           </li>
         ))}

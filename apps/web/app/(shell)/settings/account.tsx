@@ -3,6 +3,7 @@
 import { useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
 import { getDesktop } from "@/lib/client/desktop";
 
@@ -62,7 +63,14 @@ export function Account() {
           {error ? <p className="mt-1 text-destructive text-sm">{error}</p> : null}
         </div>
         <Button disabled={deleting} onClick={() => void deleteAccount()} size="sm" variant="destructive">
-          {deleting ? "Deleting…" : "Delete account"}
+          {deleting ? (
+            <>
+              <Spinner className="size-3.5" />
+              Deleting…
+            </>
+          ) : (
+            "Delete account"
+          )}
         </Button>
       </div>
     </section>

@@ -3,6 +3,7 @@
 import { SignIn, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * Signs the user in here in the browser (passkeys work natively), then — on an
@@ -48,6 +49,7 @@ export function HandoffToDesktop({ port, state }: { port: number; state: string 
       </p>
       {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
       <Button className="mt-5 w-full" disabled={status !== "idle"} onClick={() => void openApp()}>
+        {status === "idle" ? null : <Spinner className="size-3.5" />}
         {status === "sent" ? "Returning to Bambii…" : "Open Bambii"}
       </Button>
       <button

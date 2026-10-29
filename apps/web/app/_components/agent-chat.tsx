@@ -24,6 +24,7 @@ import { describeFailure, OFFLINE_MESSAGE } from "@/lib/client/api";
 import { appDataSnapshot } from "@/lib/client/app-data";
 import { useEveHeaders } from "@/lib/client/eve-headers";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Loader } from "@/components/ui/loader";
 import { refreshSidebar } from "@/lib/client/events";
 import { formatElapsed, formatTypical, useReplyTimer } from "@/lib/client/reply-timing";
 import { AgentMessage } from "./agent-message";
@@ -507,6 +508,10 @@ export function AgentChat({
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
+      ) : null}
+      {/* A saved chat catching up with its session, before any of it is on screen. */}
+      {isResuming && isEmpty && !showArchive ? (
+        <Loader className="pointer-events-none absolute inset-0 z-10" label="Loading chat…" />
       ) : null}
 
       <div

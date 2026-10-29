@@ -3,6 +3,7 @@
 import { useAuth, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Loader } from "@/components/ui/loader";
 
 /** Loaded in the Mac app window with the one-time token from the browser handoff. */
 export default function DesktopCompletePage() {
@@ -44,7 +45,11 @@ export default function DesktopCompletePage() {
 
   return (
     <main className="flex h-dvh flex-col items-center justify-center gap-3 p-6 [-webkit-app-region:drag]">
-      <p className="text-muted-foreground text-sm">{error ? `Couldn't sign in: ${error}` : "Signing you in…"}</p>
+      {error ? (
+        <p className="text-muted-foreground text-sm">{`Couldn't sign in: ${error}`}</p>
+      ) : (
+        <Loader label="Signing you in…" />
+      )}
       {error ? (
         <a className="text-sm underline [-webkit-app-region:no-drag]" href="/sign-in">
           Try again
