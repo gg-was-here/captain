@@ -31,6 +31,7 @@ import { AgentMessage } from "./agent-message";
 import { AttachButton, AttachmentChips, MicButton } from "./composer-buttons";
 import { ConnectPrompt } from "./connect-prompt";
 import { AppReadyCard, ThreadAppContext } from "./tool-results";
+import { LegalFooter } from "./legal";
 import { NewThreadMenu } from "./new-thread-dialog";
 
 export interface ChatBot {
@@ -568,6 +569,10 @@ export function AgentChat({
           </div>
         )}
       </div>
+      {/* The home screen, which has no composer at the bottom to collide with. */}
+      {showConversationLayout || !bot.intro ? null : (
+        <LegalFooter className="absolute inset-x-0 bottom-0 pb-[max(1.25rem,env(safe-area-inset-bottom))]" />
+      )}
     </main>
     </ThreadAppContext.Provider>
   );
