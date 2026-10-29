@@ -12,9 +12,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
 import { onRefreshSidebar } from "@/lib/client/events";
 import { useIsMobile } from "@/lib/client/use-mobile";
-import { avatarColor, cn, roundButton } from "@/lib/utils";
+import { cn, roundButton } from "@/lib/utils";
 import { NewThreadMenu } from "./new-thread-dialog";
 import { useSidebar } from "./sidebar-state";
+import { avatarBackground, BotGlyph } from "./bot-glyph";
 
 const botByAgent = new Map(SYSTEM_BOTS.map((bot) => [bot.agent, bot]));
 
@@ -214,10 +215,10 @@ export function Sidebar() {
                     <span
                       className={cn(
                         "flex size-10 shrink-0 items-center justify-center rounded-full text-xl",
-                        avatarColor(thread.agent + (thread.appId ?? "")),
+                        avatarBackground(icon, thread.agent + (thread.appId ?? "")),
                       )}
                     >
-                      {icon}
+                      <BotGlyph icon={icon} />
                     </span>
                     <span className="min-w-0 flex-1 pr-5">
                       <span className="block truncate font-medium">{thread.title}</span>

@@ -34,6 +34,7 @@ import { ConnectPrompt } from "./connect-prompt";
 import { AppReadyCard, ThreadAppContext } from "./tool-results";
 import { LegalFooter } from "./legal";
 import { NewThreadMenu } from "./new-thread-dialog";
+import { BotGlyph } from "./bot-glyph";
 
 export interface ChatBot {
   readonly agent: string;
@@ -540,7 +541,9 @@ export function AgentChat({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">
-            <span className="text-5xl">{bot.icon}</span>
+            <span className="text-5xl">
+              <BotGlyph icon={bot.icon} />
+            </span>
             <h1 className="font-medium text-3xl tracking-tighter sm:text-4xl">{AGENT_NAME}</h1>
             <p className="max-w-sm text-muted-foreground text-sm">{bot.tagline}</p>
           </div>
@@ -769,7 +772,9 @@ function ChatHeader({ bot, title }: { readonly bot: ChatBot; readonly title?: st
       {/* A floating pill with the chat's avatar and name, as in a messaging app. */}
       {/* On phones, room on both sides for the sidebar and panel buttons. */}
       <div className="flex max-w-[calc(100%-7.5rem)] items-center gap-2 md:max-w-[60%] rounded-full border bg-background/90 py-1.5 pr-4 pl-1.5 shadow-sm backdrop-blur-md">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{bot.icon}</span>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
+          <BotGlyph icon={bot.icon} />
+        </span>
         <span className="truncate font-medium text-sm">{title || bot.name}</span>
       </div>
     </header>
@@ -811,7 +816,9 @@ function PendingThinking({
     <Message from="assistant">
       <MessageContent>
         <div className="flex items-center gap-2 text-sm">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{icon}</span>
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
+            <BotGlyph icon={icon} />
+          </span>
           {/* Only the activity is announced; a timer read out every second would drown it. */}
           <div aria-live="polite">
             <Shimmer duration={1.5}>{`${label}…`}</Shimmer>

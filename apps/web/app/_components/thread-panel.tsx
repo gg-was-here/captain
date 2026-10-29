@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useDesktop } from "@/lib/client/desktop";
 import { COMPACT_QUERY, useIsMobile, useMediaQuery } from "@/lib/client/use-mobile";
-import { avatarColor, cn, roundButton } from "@/lib/utils";
+import { cn, roundButton } from "@/lib/utils";
 import type { ChatBot } from "./agent-chat";
 import { AppRender, type SpaceApp } from "./space";
+import { avatarBackground, BotGlyph } from "./bot-glyph";
 
 /** Just wide enough for the About form and an A4 preview; the phone preview sizes itself to the height. */
 const PANEL_WIDTH = 340;
@@ -93,10 +94,10 @@ export function ThreadPanel({
             className={cn(
               "flex shrink-0 items-center justify-center rounded-full shadow-sm",
               sheet ? "size-8 text-base" : "size-12 text-2xl",
-              avatarColor(avatarSeed),
+              avatarBackground(icon, avatarSeed),
             )}
           >
-            {icon}
+            <BotGlyph icon={icon} />
           </span>
           <span className={cn("flex min-w-0 flex-col", !sheet && "max-w-full items-center")}>
             <span className={cn("max-w-full truncate font-medium tracking-tight", sheet ? "text-sm" : "mt-2 text-base")}>
