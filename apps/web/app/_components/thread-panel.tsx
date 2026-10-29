@@ -11,7 +11,7 @@ import { COMPACT_QUERY, useIsMobile, useMediaQuery } from "@/lib/client/use-mobi
 import { cn, roundButton } from "@/lib/utils";
 import type { ChatBot } from "./agent-chat";
 import { AppRender, type SpaceApp } from "./space";
-import { avatarBackground, BotGlyph } from "./bot-glyph";
+import { avatarTint, BotGlyph, isBambiiIcon } from "./bot-glyph";
 
 /** Just wide enough for the About form and an A4 preview; the phone preview sizes itself to the height. */
 const PANEL_WIDTH = 340;
@@ -54,6 +54,8 @@ export function ThreadPanel({
   readonly onClose: () => void;
 }) {
   const icon = app?.icon ?? bot.icon;
+  // Bambii chats are colored by thread, matching their row in the sidebar.
+  const tint = avatarTint(icon, isBambiiIcon(icon) ? threadId : avatarSeed);
   const name = app?.name ?? title ?? bot.name;
   const tabs = kind === "application" ? (["Details", "Render"] as const) : (["About", "Computer"] as const);
   // Application threads open on the app itself; message threads on About.
@@ -94,8 +96,9 @@ export function ThreadPanel({
             className={cn(
               "flex shrink-0 items-center justify-center rounded-full shadow-sm",
               sheet ? "size-8 text-base" : "size-12 text-2xl",
-              avatarBackground(icon, avatarSeed),
+              tint.className,
             )}
+            style={tint.style}
           >
             <BotGlyph icon={icon} />
           </span>

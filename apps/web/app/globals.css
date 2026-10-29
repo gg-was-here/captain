@@ -55,6 +55,22 @@
   }
 }
 
+/*
+ * Each Bambii chat's fawn avatar: a soft circle and a deeper fawn in the same hue. --fawn-h and the shade
+ * offsets --fawn-v1/--fawn-v2 (0–1) come from fawnStyle() in lib/utils.ts.
+ */
+.fawn-avatar {
+  background-color: hsl(var(--fawn-h) calc(55% + var(--fawn-v1) * 25%) calc(88% + var(--fawn-v2) * 5%));
+  color: hsl(var(--fawn-h) calc(40% + var(--fawn-v1) * 20%) calc(32% + var(--fawn-v2) * 8%));
+}
+
+@media (prefers-color-scheme: dark) {
+  .fawn-avatar {
+    background-color: hsl(var(--fawn-h) calc(30% + var(--fawn-v1) * 15%) calc(20% + var(--fawn-v2) * 6%));
+    color: hsl(var(--fawn-h) calc(55% + var(--fawn-v1) * 20%) calc(72% + var(--fawn-v2) * 8%));
+  }
+}
+
 /* Not inline: font utilities must read the variables so each host's font loader can override them. */
 @theme {
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;

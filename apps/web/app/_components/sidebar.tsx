@@ -15,7 +15,7 @@ import { useIsMobile } from "@/lib/client/use-mobile";
 import { cn, roundButton } from "@/lib/utils";
 import { NewThreadMenu } from "./new-thread-dialog";
 import { useSidebar } from "./sidebar-state";
-import { avatarBackground, BotGlyph } from "./bot-glyph";
+import { avatarTint, BotGlyph, isBambiiIcon } from "./bot-glyph";
 
 const botByAgent = new Map(SYSTEM_BOTS.map((bot) => [bot.agent, bot]));
 
@@ -203,6 +203,7 @@ export function Sidebar() {
               const icon =
                 thread.agent === "app-bot" ? (app?.icon ?? "✨") : (botByAgent.get(thread.agent)?.icon ?? "💬");
               const active = pathname === `/t/${thread.id}`;
+              const tint = avatarTint(icon, isBambiiIcon(icon) ? thread.id : thread.agent + (thread.appId ?? ""));
               return (
                 <div className="group relative" key={thread.id}>
                   <Link
@@ -213,10 +214,8 @@ export function Sidebar() {
                     href={`/t/${thread.id}`}
                   >
                     <span
-                      className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-full text-xl",
-                        avatarBackground(icon, thread.agent + (thread.appId ?? "")),
-                      )}
+                      className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-xl", tint.className)}
+                      style={tint.style}
                     >
                       <BotGlyph icon={icon} />
                     </span>

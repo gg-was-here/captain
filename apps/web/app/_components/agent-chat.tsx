@@ -34,7 +34,7 @@ import { ConnectPrompt } from "./connect-prompt";
 import { AppReadyCard, ThreadAppContext } from "./tool-results";
 import { LegalFooter } from "./legal";
 import { NewThreadMenu } from "./new-thread-dialog";
-import { BotGlyph } from "./bot-glyph";
+import { avatarTint, BotGlyph } from "./bot-glyph";
 
 export interface ChatBot {
   readonly agent: string;
@@ -446,7 +446,7 @@ export function AgentChat({
     <ThreadAppContext.Provider value={appId}>
     <main className="relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       {showConversationLayout ? (
-        <ChatHeader bot={bot} title={title} />
+        <ChatHeader bot={bot} threadId={initialThreadId} title={title} />
       ) : null}
       {/* After the header: Electron resolves drag regions in DOM order, so a later drag region would swallow clicks. */}
       {panelToggle ? (
@@ -500,6 +500,7 @@ export function AgentChat({
             ))}
             {showLoader ? (
               <PendingThinking
+                threadId={initialThreadId}
                 elapsedMs={replyTimer.elapsedMs}
                 icon={bot.icon}
                 label={activity}
@@ -766,13 +767,25 @@ function ErrorMessage({ message }: { readonly message: string }) {
   );
 }
 
-function ChatHeader({ bot, title }: { readonly bot: ChatBot; readonly title?: string }) {
+function ChatHeader({
+  bot,
+  threadId,
+  title,
+}: {
+  readonly bot: ChatBot;
+  readonly threadId?: string;
+  readonly title?: string;
+}) {
+  const tint = avatarTint(bot.icon, threadId);
   return (
     <header className="pointer-events-none absolute top-0 right-0 left-0 z-20 flex h-14 items-center justify-center [-webkit-app-region:drag]">
       {/* A floating pill with the chat's avatar and name, as in a messaging app. */}
       {/* On phones, room on both sides for the sidebar and panel buttons. */}
       <div className="flex max-w-[calc(100%-7.5rem)] items-center gap-2 md:max-w-[60%] rounded-full border bg-background/90 py-1.5 pr-4 pl-1.5 shadow-sm backdrop-blur-md">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
+        <span
+          className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-sm", tint.className)}
+          style={tint.style}
+        >
           <BotGlyph icon={bot.icon} />
         </span>
         <span className="truncate font-medium text-sm">{title || bot.name}</span>
@@ -806,17 +819,24 @@ function PendingThinking({
   label,
   elapsedMs,
   typicalMs,
+  threadId,
 }: {
   readonly icon: string;
   readonly label: Activity;
   readonly elapsedMs?: number;
   readonly typicalMs?: number;
+  /** Colors Bambii's fawn to match this chat. */
+  readonly threadId?: string;
 }) {
+  const tint = avatarTint(icon, threadId);
   return (
     <Message from="assistant">
       <MessageContent>
         <div className="flex items-center gap-2 text-sm">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
+          <span
+            className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-sm", tint.className)}
+            style={tint.style}
+          >
             <BotGlyph icon={icon} />
           </span>
           {/* Only the activity is announced; a timer read out every second would drown it. */}
