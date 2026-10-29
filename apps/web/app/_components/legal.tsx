@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BambiiLogo } from "@/components/bambii-logo";
 
 /** Where privacy and legal questions go; shown in both legal pages and their footer. */
 export const LEGAL_CONTACT = "privacy@bambii.ai";
@@ -19,8 +20,12 @@ export function LegalPage({
   return (
     <div className="h-dvh overflow-y-auto bg-background text-foreground">
       <div className="mx-auto max-w-2xl px-5 pt-10 pb-16 sm:px-6 sm:pt-14">
-        <Link className="text-muted-foreground text-sm transition-colors hover:text-foreground" href="/">
-          ← Bambii
+        <Link
+          className="inline-flex items-center gap-2 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
+          href="/"
+        >
+          <BambiiLogo className="size-6 text-foreground" title="" />
+          Bambii
         </Link>
 
         <h1 className="mt-8 font-semibold text-3xl tracking-tight sm:text-4xl">{title}</h1>

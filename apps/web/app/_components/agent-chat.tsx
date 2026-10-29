@@ -24,6 +24,7 @@ import { describeFailure, OFFLINE_MESSAGE } from "@/lib/client/api";
 import { appDataSnapshot } from "@/lib/client/app-data";
 import { useEveHeaders } from "@/lib/client/eve-headers";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { BambiiLogo } from "@/components/bambii-logo";
 import { Loader } from "@/components/ui/loader";
 import { refreshSidebar } from "@/lib/client/events";
 import { formatElapsed, formatTypical, useReplyTimer } from "@/lib/client/reply-timing";
@@ -527,6 +528,7 @@ export function AgentChat({
         {showConversationLayout ? null : bot.intro ? (
           // The home screen starts chats through the + menu rather than a composer.
           <div className="flex flex-col items-center gap-3 text-center">
+            <BambiiLogo className="mb-1 size-14 sm:size-16" title="" />
             <h1 className="font-medium text-3xl tracking-tighter sm:text-4xl">{AGENT_NAME}</h1>
             <p className="max-w-md text-balance text-muted-foreground">{bot.intro}</p>
             <NewThreadMenu

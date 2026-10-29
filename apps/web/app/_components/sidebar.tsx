@@ -6,6 +6,7 @@ import { PanelLeftCloseIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react"
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BambiiLogo } from "@/components/bambii-logo";
 import { Loader } from "@/components/ui/loader";
 import { Spinner } from "@/components/ui/spinner";
 import { api, errorText } from "@/lib/client/api";
@@ -172,8 +173,8 @@ export function Sidebar() {
             className="mx-auto flex flex-col items-center gap-1.5 pt-1 pb-4 [-webkit-app-region:no-drag]"
             href="/new"
           >
-            <span className="flex size-14 items-center justify-center rounded-full bg-foreground text-3xl shadow-sm">
-              🧭
+            <span className="flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-sm">
+              <BambiiLogo className="size-9" title="" />
             </span>
             <span className="font-medium text-xs">Bambii</span>
           </Link>
