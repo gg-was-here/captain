@@ -215,6 +215,8 @@ app.on("open-url", (event, url) => {
 });
 
 app.whenReady().then(() => {
+  // A packaged app takes its icon from build/icon.icns; unpackaged (npm run desktop), the Dock would show Electron's.
+  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "..", "..", "build", "icon.png"));
   restrictPermissions();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
