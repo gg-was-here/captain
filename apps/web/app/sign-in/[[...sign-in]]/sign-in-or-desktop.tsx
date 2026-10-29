@@ -1,10 +1,12 @@
 "use client";
 
 import { ClerkLoaded, ClerkLoading, SignIn, SignUp } from "@clerk/nextjs";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { type CaptainDesktop, desktopErrorText, getDesktop } from "@/lib/client/desktop";
+import { cn } from "@/lib/utils";
 
 /**
  * In the Mac app, sign-in (and sign-up, which Clerk's hosted page links to)
@@ -24,7 +26,10 @@ export function SignInOrDesktop({ mode = "sign-in" }: { readonly mode?: "sign-in
         <ClerkLoading>
           <Loader />
         </ClerkLoading>
-        <ClerkLoaded>{mode === "sign-up" ? <SignUp /> : <SignIn />}</ClerkLoaded>
+        <ClerkLoaded>
+          {mode === "sign-up" ? <SignUp /> : <SignIn />}
+          <PrivacyLink className="mt-4" />
+        </ClerkLoaded>
       </>
     );
   }
@@ -53,6 +58,17 @@ export function SignInOrDesktop({ mode = "sign-in" }: { readonly mode?: "sign-in
       <Button className="mt-5 w-full" onClick={() => void start()} variant={waiting ? "outline" : "default"}>
         {waiting ? "Open browser again" : mode === "sign-up" ? "Sign up with browser" : "Sign in with browser"}
       </Button>
+      <PrivacyLink className="mt-4" />
     </div>
+  );
+}
+
+function PrivacyLink({ className }: { readonly className?: string }) {
+  return (
+    <p className={cn("text-center text-muted-foreground text-xs", className)}>
+      <Link className="underline-offset-4 transition-colors hover:text-foreground hover:underline" href="/privacy-policy">
+        Privacy Policy
+      </Link>
+    </p>
   );
 }
