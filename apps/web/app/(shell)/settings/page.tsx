@@ -1,5 +1,6 @@
 import { XIcon } from "lucide-react";
 import Link from "next/link";
+import { LegalLinks } from "@/app/_components/legal";
 import { roundButton } from "@/lib/utils";
 import { Account } from "./account";
 import { Connections } from "./connections";
@@ -20,11 +21,7 @@ export default function SettingsPage() {
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? <Account /> : null}
         <Models />
         <Connections />
-        <p className="mt-12 text-center text-muted-foreground text-xs">
-          <Link className="underline-offset-4 transition-colors hover:text-foreground hover:underline" href="/privacy-policy">
-            Privacy Policy
-          </Link>
-        </p>
+        <LegalLinks className="mt-12" />
       </div>
     </main>
   );
