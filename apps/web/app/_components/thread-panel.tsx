@@ -79,19 +79,32 @@ export function ThreadPanel({
         className={cn("relative flex h-dvh flex-col", sheet && "w-full")}
         style={sheet ? undefined : { width: PANEL_WIDTH }}
       >
-        {/* Room on both sides for the close button, so the avatar and name stay centered. */}
-        <div className="flex shrink-0 flex-col items-center px-14 pt-3 text-center">
+        {/*
+          Room on both sides for the close button, so the avatar and name stay centered. On a phone it's one
+          row, leaving the height to the app.
+        */}
+        <div
+          className={cn(
+            "flex shrink-0 items-center",
+            sheet ? "h-14 gap-2.5 pr-14 pl-4" : "flex-col px-14 pt-3 text-center",
+          )}
+        >
           <span
             className={cn(
-              "flex size-12 items-center justify-center rounded-full text-2xl shadow-sm",
+              "flex shrink-0 items-center justify-center rounded-full shadow-sm",
+              sheet ? "size-8 text-base" : "size-12 text-2xl",
               avatarColor(avatarSeed),
             )}
           >
             {icon}
           </span>
-          <span className="mt-2 max-w-full truncate font-medium text-base tracking-tight">{name}</span>
-          <span className="mt-0.5 max-w-full truncate text-muted-foreground text-xs">
-            {app ? `Version ${app.currentVersion}` : name === bot.name ? bot.tagline : bot.name}
+          <span className={cn("flex min-w-0 flex-col", !sheet && "max-w-full items-center")}>
+            <span className={cn("max-w-full truncate font-medium tracking-tight", sheet ? "text-sm" : "mt-2 text-base")}>
+              {name}
+            </span>
+            <span className={cn("max-w-full truncate text-muted-foreground text-xs", !sheet && "mt-0.5")}>
+              {app ? `Version ${app.currentVersion}` : name === bot.name ? bot.tagline : bot.name}
+            </span>
           </span>
         </div>
 
@@ -105,7 +118,10 @@ export function ThreadPanel({
           <XIcon className="size-4" />
         </button>
 
-        <div className="flex shrink-0 justify-center gap-1 px-3 pt-3 pb-3 [-webkit-app-region:no-drag]" role="tablist">
+        <div
+          className={cn("flex shrink-0 justify-center gap-1 px-3 [-webkit-app-region:no-drag]", sheet ? "pb-2" : "py-3")}
+          role="tablist"
+        >
           {tabs.map((t) => (
             <button
               aria-selected={tab === t}
@@ -123,7 +139,12 @@ export function ThreadPanel({
           ))}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 [-webkit-app-region:no-drag]">
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-y-auto [-webkit-app-region:no-drag]",
+            sheet && tab === "Render" ? "pb-[env(safe-area-inset-bottom)]" : "px-4 pb-4",
+          )}
+        >
           {tab === "About" ? (
             <ContextPane
               bot={bot}
@@ -139,6 +160,7 @@ export function ThreadPanel({
               app={app}
               bot={bot}
               buildThreadId={buildThreadId}
+              fullBleed={sheet}
               instructions={instructions}
               onInstructionsChange={onInstructionsChange}
               tab={tab}
@@ -328,12 +350,15 @@ function ApplicationSections({
   app,
   bot,
   buildThreadId,
+  fullBleed,
   tab,
   ...context
 }: ThreadContext & {
   readonly app: SpaceApp | null;
   readonly bot: ChatBot;
   readonly buildThreadId?: string | null;
+  /** On a phone the app fills the sheet: the device is already a phone, so no frame to pick. */
+  readonly fullBleed: boolean;
   readonly tab: "Details" | "Render";
 }) {
   const desktop = useDesktop();
@@ -377,6 +402,19 @@ function ApplicationSections({
     );
   }
   const frame = FRAMES[size];
+  if (fullBleed) {
+    return (
+      <section className="relative min-h-0 w-full flex-1 border-t bg-card" role="tabpanel">
+        {app ? (
+          <AppRender app={app} key={`${app.id}@${app.currentVersion}`} reloadKey={reloadKey} />
+        ) : (
+          <EmptyState icon={frame.icon}>
+            Your app will appear here once {bot.agent === "builder" ? bot.name : "it"} builds it.
+          </EmptyState>
+        )}
+      </section>
+    );
+  }
   return (
     <Pane caption={app ? `${app.name} · ${frame.label}` : undefined} fill>
       <div className="flex shrink-0 justify-center gap-1" role="radiogroup">

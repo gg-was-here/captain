@@ -10,3 +10,12 @@
 :root {
   color-scheme: light dark;
 }
+
+/* Apps run in a narrow panel and full screen on phones: keep text from resizing and fill the height. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
