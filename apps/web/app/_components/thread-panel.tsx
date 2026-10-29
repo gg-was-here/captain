@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useDesktop } from "@/lib/client/desktop";
+import { COMPACT_QUERY, useIsMobile, useMediaQuery } from "@/lib/client/use-mobile";
 import { avatarColor, cn, roundButton } from "@/lib/utils";
 import type { ChatBot } from "./agent-chat";
 import { AppRender, type SpaceApp } from "./space";
@@ -30,6 +31,7 @@ export function ThreadPanel({
   instructions,
   onInstructionsChange,
   computerStreamUrl,
+  autoHidden = false,
   onClose,
 }: {
   readonly kind: "message" | "application";
@@ -45,6 +47,8 @@ export function ThreadPanel({
   readonly onInstructionsChange: (instructions: string) => void;
   /** Live view of the computer the bot is using, once computer use exists. */
   readonly computerStreamUrl?: string;
+  /** Opened by default rather than by the user: hidden on narrow screens, where it would cover the chat. */
+  readonly autoHidden?: boolean;
   readonly onClose: () => void;
 }) {
   const icon = app?.icon ?? bot.icon;
@@ -52,14 +56,28 @@ export function ThreadPanel({
   const tabs = kind === "application" ? (["Details", "Render"] as const) : (["About", "Computer"] as const);
   // Application threads open on the app itself; message threads on About.
   const [tab, setTab] = useState<(typeof tabs)[number]>(kind === "application" ? "Render" : "About");
+  // Phones show the panel as a full-screen sheet over the chat, and tablets and narrow windows float it
+  // over the chat's right edge; wider screens put it in a column beside the chat.
+  const sheet = useIsMobile() === true;
+  const compact = useMediaQuery(COMPACT_QUERY) === true;
+  const floating = compact && !sheet;
   return (
     <motion.aside
-      animate={{ width: PANEL_WIDTH }}
-      className="h-dvh shrink-0 overflow-hidden border-l bg-background text-sm [-webkit-app-region:drag]"
-      initial={{ width: 0 }}
+      animate={{ width: sheet ? "100%" : PANEL_WIDTH }}
+      className={cn(
+        "h-dvh shrink-0 overflow-hidden border-l bg-background text-sm [-webkit-app-region:drag]",
+        // Above the floating sidebar button, which would otherwise sit on the sheet's header.
+        sheet && "fixed inset-0 z-[45] border-l-0",
+        floating && "fixed inset-y-0 right-0 z-[45] shadow-xl",
+        autoHidden && "max-lg:hidden",
+      )}
+      initial={{ width: sheet ? "100%" : 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
-      <div className="relative flex h-dvh flex-col" style={{ width: PANEL_WIDTH }}>
+      <div
+        className={cn("relative flex h-dvh flex-col", sheet && "w-full")}
+        style={sheet ? undefined : { width: PANEL_WIDTH }}
+      >
         {/* Room on both sides for the close button, so the avatar and name stay centered. */}
         <div className="flex shrink-0 flex-col items-center px-14 pt-3 text-center">
           <span

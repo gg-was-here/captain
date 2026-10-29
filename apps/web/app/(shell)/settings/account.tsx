@@ -40,8 +40,9 @@ export function Account() {
   return (
     <section className="mt-8">
       <h2 className="font-medium text-lg">Account</h2>
-      <div className="mt-4 flex items-center gap-4 rounded-xl border bg-card p-4">
-        <div className="min-w-0 flex-1">
+      {/* On a phone the buttons wrap below the text. */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card p-4">
+        <div className="min-w-48 flex-1">
           <div className="truncate font-medium">{user?.fullName ?? user?.primaryEmailAddress?.emailAddress}</div>
           <p className="mt-0.5 text-muted-foreground text-sm">Manage your profile and add a passkey to sign in with Touch ID.</p>
         </div>

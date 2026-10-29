@@ -73,7 +73,7 @@ export function Models() {
       {error ? <p className="mt-3 text-destructive text-sm">{error}</p> : null}
       <ul className="mt-4 divide-y rounded-xl border bg-card">
         {ROLES.map(({ role, label, description }) => (
-          <li className="flex items-center gap-4 p-4" key={role}>
+          <li className="flex flex-col items-stretch gap-3 p-4 sm:flex-row sm:items-center sm:gap-4" key={role}>
             <div className="min-w-0 flex-1">
               <div className="font-medium">{label}</div>
               <p className="mt-0.5 text-muted-foreground text-sm">
@@ -82,7 +82,7 @@ export function Models() {
             </div>
             {settings ? (
               <Select disabled={saving} onValueChange={(id) => void save({ ...settings, [role]: id }, role)} value={settings[role]}>
-                <SelectTrigger aria-label={label} className="w-52" size="sm">
+                <SelectTrigger aria-label={label} className="w-full sm:w-52" size="sm">
                   {/* Just the name here; descriptions only show in the open menu. */}
                   <SelectValue>{models.find((m) => m.id === settings[role])?.label}</SelectValue>
                 </SelectTrigger>

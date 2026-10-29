@@ -2,6 +2,7 @@
 
 import { PanelRightCloseIcon, PanelRightIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { COMPACT_QUERY, matchesNow, useMediaQuery } from "@/lib/client/use-mobile";
 import { roundButton } from "@/lib/utils";
 import { AgentChat, type BuiltApp, type ChatArchive, type ChatBot } from "./agent-chat";
 import { type SpaceApp, SpaceContext } from "./space";
@@ -36,8 +37,12 @@ export function ThreadView({
     initialSpaceApp && initialSpaceApp.currentVersion > 0 ? initialSpaceApp : null,
   );
   const kind = bot.agent === "builder" || bot.agent === "app-bot" || spaceApp ? "application" : "message";
-  // Application threads open with the app showing; message threads start with the panel closed.
-  const [panelOpen, setPanelOpen] = useState(kind === "application");
+  // Application threads open with the app showing where there's room beside the chat ("auto": decided
+  // by CSS, so the first paint is right); on narrower screens it would cover the chat, so it waits to be
+  // opened. Message threads start with it closed.
+  const [panelOpen, setPanelOpen] = useState<boolean | "auto">(kind === "application" ? "auto" : false);
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const panelShowing = panelOpen === "auto" ? compact === false : panelOpen;
   const [threadId, setThreadId] = useState(initialThreadId ?? null);
   const [instructions, setInstructions] = useState(initialInstructions);
   const [editThreadId, setEditThreadId] = useState(buildThreadId ?? initialThreadId ?? null);
@@ -48,14 +53,17 @@ export function ThreadView({
   }, []);
   const onAppBuilt = useCallback(
     (app: BuiltApp) => {
-      openApp({ id: app.appId, name: app.name, icon: app.icon, description: "", currentVersion: app.version });
+      setSpaceApp({ id: app.appId, name: app.name, icon: app.icon, description: "", currentVersion: app.version });
+      // On a narrow screen the app would cover the chat, including on every reload of a Builder thread,
+      // which announces its apps again; the app-ready card's Launch button opens it there instead.
+      if (!matchesNow(COMPACT_QUERY)) setPanelOpen(true);
       if (bot.agent === "builder" && threadId) setEditThreadId(threadId);
     },
-    [bot.agent, threadId, openApp],
+    [bot.agent, threadId],
   );
   const space = useMemo(() => ({ open: openApp }), [openApp]);
 
-  const PanelIcon = panelOpen ? PanelRightCloseIcon : PanelRightIcon;
+  const PanelIcon = panelShowing ? PanelRightCloseIcon : PanelRightIcon;
 
   return (
     <SpaceContext.Provider value={space}>
@@ -69,9 +77,9 @@ export function ThreadView({
         onThreadCreated={setThreadId}
         panelToggle={
           <button
-            aria-label={panelOpen ? "Close side panel" : "Open side panel"}
+            aria-label={panelShowing ? "Close side panel" : "Open side panel"}
             className={roundButton}
-            onClick={() => setPanelOpen((open) => !open)}
+            onClick={() => setPanelOpen((open) => (open === "auto" ? matchesNow(COMPACT_QUERY) : !open))}
             type="button"
           >
             <PanelIcon className="size-4" />
@@ -83,6 +91,7 @@ export function ThreadView({
       />
       {panelOpen ? (
         <ThreadPanel
+          autoHidden={panelOpen === "auto"}
           app={spaceApp}
           avatarSeed={bot.agent + (appId ?? spaceApp?.id ?? "")}
           bot={bot}

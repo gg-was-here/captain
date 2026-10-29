@@ -10,7 +10,7 @@ export const metadata = { title: "Settings · Bambii" };
 export default function SettingsPage() {
   return (
     <main className="min-w-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-2xl px-6 pt-16 pb-12">
+      <div className="mx-auto max-w-2xl px-4 pt-16 pb-12 sm:px-6">
         <div className="flex items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl tracking-tight">Settings</h1>
           <Link aria-label="Close settings" className={roundButton} href="/" title="Close">

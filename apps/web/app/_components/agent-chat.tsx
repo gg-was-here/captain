@@ -25,6 +25,7 @@ import { appDataSnapshot } from "@/lib/client/app-data";
 import { useEveHeaders } from "@/lib/client/eve-headers";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { refreshSidebar } from "@/lib/client/events";
+import { formatElapsed, formatTypical, useReplyTimer } from "@/lib/client/reply-timing";
 import { AgentMessage } from "./agent-message";
 import { AttachButton, AttachmentChips, MicButton } from "./composer-buttons";
 import { ConnectPrompt } from "./connect-prompt";
@@ -315,6 +316,11 @@ export function AgentChat({
   const errorMessage = sessionEnded
     ? undefined
     : (cancellationError ?? saveError ?? explainSendError(agent.error, sessionId) ?? turnFailure);
+  const replyTimer = useReplyTimer(bot.agent, {
+    busy: isBusy,
+    paused: awaitingUser,
+    failed: errorMessage !== undefined || sessionEnded,
+  });
   // Token-limit prompts (Continue or Stop) aren't tied to a tool call, so they're shown on their own.
   const sessionLimitPrompts = Object.values(agent.data.inputs).filter(
     (input) => input.status === "open" && input.request.kind === "session-limit",
@@ -336,6 +342,7 @@ export function AgentChat({
     );
 
   const requestCancellation = () => {
+    replyTimer.onCancel();
     setCancellationError(undefined);
     void agent.cancel().catch((error: unknown) => {
       setCancellationError(toErrorMessage(error));
@@ -396,6 +403,7 @@ export function AgentChat({
     // text, but only if the server never took the message: otherwise sending it again would duplicate it.
     sendFailure.current = undefined;
     sendAccepted.current = false;
+    replyTimer.onSend(isBusy);
     await agent.send(message.files.length === 0 ? text : parts, options);
     if (sendFailure.current && !sendAccepted.current) throw sendFailure.current;
   };
@@ -486,7 +494,14 @@ export function AgentChat({
                 onChoose={(optionId) => void agent.respond([{ optionId, requestId: request.requestId }])}
               />
             ))}
-            {showLoader ? <PendingThinking icon={bot.icon} label={activity} /> : null}
+            {showLoader ? (
+              <PendingThinking
+                elapsedMs={replyTimer.elapsedMs}
+                icon={bot.icon}
+                label={activity}
+                typicalMs={replyTimer.typicalMs}
+              />
+            ) : null}
             {sessionEnded ? <SessionEnded onRestart={() => agent.reset()} /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
@@ -495,17 +510,18 @@ export function AgentChat({
       ) : null}
 
       <div
+        // In a chat, the bottom padding also clears the home indicator on phones without a home button.
         className={cn(
           "mx-auto w-full px-4 sm:px-6",
           showConversationLayout
-            ? "absolute bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
+            ? "absolute bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
             : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
         )}
       >
         {showConversationLayout ? null : bot.intro ? (
           // The home screen starts chats through the + menu rather than a composer.
           <div className="flex flex-col items-center gap-3 text-center">
-            <h1 className="font-medium text-4xl tracking-tighter">{AGENT_NAME}</h1>
+            <h1 className="font-medium text-3xl tracking-tighter sm:text-4xl">{AGENT_NAME}</h1>
             <p className="max-w-md text-balance text-muted-foreground">{bot.intro}</p>
             <NewThreadMenu
               align="center"
@@ -517,7 +533,7 @@ export function AgentChat({
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">
             <span className="text-5xl">{bot.icon}</span>
-            <h1 className="font-medium text-4xl tracking-tighter">{AGENT_NAME}</h1>
+            <h1 className="font-medium text-3xl tracking-tighter sm:text-4xl">{AGENT_NAME}</h1>
             <p className="max-w-sm text-muted-foreground text-sm">{bot.tagline}</p>
           </div>
         )}
@@ -739,7 +755,8 @@ function ChatHeader({ bot, title }: { readonly bot: ChatBot; readonly title?: st
   return (
     <header className="pointer-events-none absolute top-0 right-0 left-0 z-20 flex h-14 items-center justify-center [-webkit-app-region:drag]">
       {/* A floating pill with the chat's avatar and name, as in a messaging app. */}
-      <div className="flex max-w-[60%] items-center gap-2 rounded-full border bg-background/90 py-1.5 pr-4 pl-1.5 shadow-sm backdrop-blur-md">
+      {/* On phones, room on both sides for the sidebar and panel buttons. */}
+      <div className="flex max-w-[calc(100%-7.5rem)] items-center gap-2 md:max-w-[60%] rounded-full border bg-background/90 py-1.5 pr-4 pl-1.5 shadow-sm backdrop-blur-md">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{bot.icon}</span>
         <span className="truncate font-medium text-sm">{title || bot.name}</span>
       </div>
@@ -763,14 +780,36 @@ function activityOf(message: EveMessage): Activity | undefined {
   return "Working";
 }
 
-/** Shown while a reply is on its way: the bot's avatar and what it is doing right now. */
-function PendingThinking({ icon, label }: { readonly icon: string; readonly label: Activity }) {
+/**
+ * Shown while a reply is on its way: the bot's avatar, what it is doing right now, how long it has
+ * been at it, and how long this bot usually takes.
+ */
+function PendingThinking({
+  icon,
+  label,
+  elapsedMs,
+  typicalMs,
+}: {
+  readonly icon: string;
+  readonly label: Activity;
+  readonly elapsedMs?: number;
+  readonly typicalMs?: number;
+}) {
   return (
-    <Message aria-live="polite" from="assistant">
+    <Message from="assistant">
       <MessageContent>
         <div className="flex items-center gap-2 text-sm">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{icon}</span>
-          <Shimmer duration={1.5}>{`${label}…`}</Shimmer>
+          {/* Only the activity is announced; a timer read out every second would drown it. */}
+          <div aria-live="polite">
+            <Shimmer duration={1.5}>{`${label}…`}</Shimmer>
+          </div>
+          {elapsedMs === undefined ? null : (
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {formatElapsed(elapsedMs)}
+              {typicalMs === undefined ? null : ` · usually ${formatTypical(typicalMs)}`}
+            </span>
+          )}
         </div>
       </MessageContent>
     </Message>

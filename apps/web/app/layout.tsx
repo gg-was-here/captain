@@ -1,5 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "Bambii",
   description: "Chat with bots for Slack, Gmail and Notion — and build apps that run on your Mac.",
 };
+
+// "cover" lets the page reach under the iPhone notch and home bar; the composer pads itself clear.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
   const page = (

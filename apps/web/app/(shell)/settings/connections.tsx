@@ -96,9 +96,9 @@ export function Connections() {
         {notice ? <p className="mt-3 text-sm">{notice}</p> : null}
         <ul className="mt-4 divide-y rounded-xl border bg-card">
           {(connections ?? []).map((c) => (
-            <li className="flex items-center gap-4 p-4" key={c.name}>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+            <li className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4" key={c.name}>
+              <div className="min-w-48 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{c.label}</span>
                   {c.status === "connected" ? <Badge variant="secondary">Connected</Badge> : null}
                   {c.status === "unavailable" ? <Badge variant="outline">Not configured</Badge> : null}
