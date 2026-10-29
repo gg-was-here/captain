@@ -98,3 +98,21 @@ export function LegalLinks({ className }: { readonly className?: string }) {
     </p>
   );
 }
+
+/** A page footer: © Bambii, Privacy Policy and Terms of Service, for the home screen and sign-in pages. */
+export function LegalFooter({ className }: { readonly className?: string }) {
+  const link = "underline-offset-4 transition-colors hover:text-foreground hover:underline";
+  return (
+    <footer
+      className={`flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-muted-foreground text-xs [-webkit-app-region:no-drag] ${className ?? ""}`}
+    >
+      <span>© 2026 Bambii</span>
+      <Link className={link} href="/privacy-policy">
+        Privacy Policy
+      </Link>
+      <Link className={link} href="/terms">
+        Terms of Service
+      </Link>
+    </footer>
+  );
+}
