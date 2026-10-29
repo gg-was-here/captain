@@ -4,7 +4,7 @@ import { LegalLinks } from "@/app/_components/legal";
 import { roundButton } from "@/lib/utils";
 import { Account } from "./account";
 import { Connections } from "./connections";
-import { Models } from "./models";
+import { Usage } from "./usage";
 
 export const metadata = { title: "Settings · Bambii" };
 
@@ -19,7 +19,7 @@ export default function SettingsPage() {
           </Link>
         </div>
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? <Account /> : null}
-        <Models />
+        <Usage />
         <Connections />
         <LegalLinks className="mt-12" />
       </div>

@@ -44,17 +44,44 @@ describe("usage limits", () => {
     expect(usage.weightedTokens({ inputTokens: 100_000, cacheReadTokens: 100_000 })).toBe(10_000);
   });
 
-  it("stops model work once today's token budget is used", async () => {
-    vi.stubEnv("CAPTAIN_DAILY_TOKENS_LIMIT", "10000");
-    await usage.assertWithinLimit("user_tokens", "tokens");
-    await usage.recordTokens("user_tokens", { inputTokens: 5000, outputTokens: 1000 });
-    await expect(usage.assertWithinLimit("user_tokens", "tokens")).rejects.toThrow("today's limit");
+  it("prices each call at its model's rate, in micro-dollars", () => {
+    const call = { inputTokens: 1_000_000, outputTokens: 100_000 };
+    expect(usage.costMicros("claude-haiku-5-5", call)).toBe(150_000); // $0.10 + $0.05
+    expect(usage.costMicros("claude-sonnet-5-5", call)).toBe(3_000_000); // $2 + $1
+    expect(usage.costMicros("claude-opus-5-5", call)).toBe(6_000_000); // $4 + $2
   });
 
-  it("applies the deployment-wide token cap when it's set", async () => {
-    vi.stubEnv("CAPTAIN_DAILY_GLOBAL_TOKENS_LIMIT", "1");
-    await usage.recordTokens("user_global", { inputTokens: 10 });
-    await expect(usage.assertWithinLimit("user_other", "tokens")).rejects.toThrow("Bambii has reached today's AI usage limit");
+  it("stops model work once today's allowance is used", async () => {
+    vi.stubEnv("CAPTAIN_USER_DAILY_USD", "0.5");
+    await usage.assertWithinBudget("user_day");
+    await usage.recordCost("user_day", "claude-sonnet-5-5", { inputTokens: 250_000 });
+    await expect(usage.assertWithinBudget("user_day")).rejects.toThrow("today's AI allowance");
+    // Someone else still has their own allowance.
+    await usage.assertWithinBudget("user_day_other");
+  });
+
+  it("stops model work once this month's allowance is used", async () => {
+    vi.stubEnv("CAPTAIN_USER_MONTHLY_USD", "0.5");
+    await usage.recordCost("user_month", "claude-opus-5-5", { inputTokens: 125_000 });
+    await expect(usage.assertWithinBudget("user_month")).rejects.toThrow("this month's AI allowance");
+  });
+
+  it("applies the deployment-wide daily and monthly caps to everyone", async () => {
+    await usage.recordCost("user_global", "claude-haiku-5-5", { inputTokens: 1_000_000 }); // $0.10
+    vi.stubEnv("CAPTAIN_GLOBAL_DAILY_USD", "0.1");
+    await expect(usage.assertWithinBudget("user_global_other")).rejects.toThrow("Bambii has reached today's AI usage limit");
+    vi.stubEnv("CAPTAIN_GLOBAL_MONTHLY_USD", "0.1");
+    await expect(usage.assertWithinBudget("user_global_other")).rejects.toThrow("Bambii has reached this month's AI usage limit");
+  });
+
+  it("reports a user's spend against their allowance", async () => {
+    await usage.recordCost("user_status", "claude-sonnet-5-5", { inputTokens: 100_000, outputTokens: 10_000 });
+    const status = await usage.budgetStatus("user_status");
+    expect(status.usedToday).toBeCloseTo(0.3);
+    expect(status.usedThisMonth).toBeCloseTo(0.3);
+    expect(status.dailyLimit).toBe(1);
+    expect(status.monthlyLimit).toBe(3);
+    expect(new Date(status.monthResetsAt).getUTCDate()).toBe(1);
   });
 
   it("refunds a use that produced nothing", async () => {

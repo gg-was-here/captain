@@ -110,7 +110,7 @@ export default function TermsPage() {
 
       <Section title="5. Usage limits and changes to the Service">
         <p>
-          The Service is currently free and has daily usage limits, which we may change. We may add, change or remove
+          The Service is currently free and has daily and monthly usage limits, which we may change. We may add, change or remove
           features, and suspend or end parts of the Service. If we introduce paid features, we&apos;ll show you their
           price and terms before you buy anything.
         </p>

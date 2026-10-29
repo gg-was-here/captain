@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
             </li>
             <li>
               <strong>Instructions and settings.</strong> Extra instructions you give a chat, the names and
-              descriptions of apps you ask Builder to make, and your choice of AI models.
+              descriptions of apps you ask Builder to make.
             </li>
             <li>
               <strong>Messages to us.</strong> Anything you send when you contact us.
@@ -113,7 +113,7 @@ export default function PrivacyPolicyPage() {
             </li>
             <li>
               <strong>Usage counts.</strong> How many messages, app builds, AI calls and connector calls you make each
-              day, to enforce usage limits.
+              day, and what your AI use costs, to enforce usage limits.
             </li>
           </List>
         </Sub>

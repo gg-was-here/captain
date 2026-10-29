@@ -18,7 +18,7 @@ Bambii.app (Electron, apps/desktop) ──loads──▶ Web UI + API (Next.js, 
 | `apps/web` | Threads, sidebar, Space panel, settings, and the runtime APIs that built apps call. |
 | `apps/desktop` | Electron shell. Downloads app bundles into `~/Library/Application Support/Captain/apps`, keeps each app's data in SQLite, and enforces per-app connector permissions. |
 
-Each user picks two Claude models in **Settings → Models**: a default model for Bambii, app bots and AI calls from apps (Haiku 5.5 unless changed), and an app building model for Builder (Opus 5.5 unless changed). `CAPTAIN_APP_MODEL` forces one model for every app's AI calls.
+Models are set by the operator, not users: `CAPTAIN_CHAT_MODEL` for Bambii, app bots and AI calls from apps (Claude Haiku 5.5 unless set), and `CAPTAIN_BUILDER_MODEL` for Builder (Claude Sonnet 5.5 unless set). AI spend is capped in dollars, per user and for the whole deployment, per UTC day and month: `CAPTAIN_USER_DAILY_USD` ($1), `CAPTAIN_USER_MONTHLY_USD` ($3), `CAPTAIN_GLOBAL_DAILY_USD` ($12) and `CAPTAIN_GLOBAL_MONTHLY_USD` ($180). Users see their spend in **Settings → Usage**.
 
 ## How an app gets built
 1. In a thread, you ask Builder for something, e.g. "build a task tracker from my Slack messages".

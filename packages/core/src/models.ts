@@ -1,67 +1,42 @@
-import { eq } from "drizzle-orm";
 import { defineDynamic } from "eve";
 import { anthropic } from "eve/models/anthropic";
-import { getDb, schema } from "./db";
 
 /**
- * The Claude models a user can pick in Settings → Models. Each user has two
- * choices: a default model for chatting (Captain, app bots, AI calls from apps)
- * and a model for building apps (Builder, which writes the code).
+ * The Claude models Bambii can run, with their list prices in USD per million tokens. Models are picked
+ * by the operator, not users, so spend stays predictable: one model for chatting (Bambii, app bots, AI
+ * calls from apps) and one for building apps (Builder, which writes the code).
  */
 export const MODELS = [
-  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", description: "Fastest and cheapest" },
-  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", description: "Balanced speed and quality" },
-  { id: "claude-opus-5-5", label: "Claude Opus 5.5", description: "Most capable, best for code" },
+  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", input: 0.1, output: 0.5 },
+  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", input: 2, output: 10 },
+  { id: "claude-opus-5-5", label: "Claude Opus 5.5", input: 4, output: 20 },
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]["id"];
 export type ModelRole = "default" | "builder";
-export type ModelSettings = Record<ModelRole, ModelId>;
 
-export const DEFAULT_MODELS: ModelSettings = { default: "claude-haiku-5-5", builder: "claude-opus-5-5" };
+export const DEFAULT_MODELS: Record<ModelRole, ModelId> = { default: "claude-haiku-5-5", builder: "claude-sonnet-5-5" };
+
+const ENV: Record<ModelRole, string> = { default: "CAPTAIN_CHAT_MODEL", builder: "CAPTAIN_BUILDER_MODEL" };
 
 export const isModelId = (id: unknown): id is ModelId => MODELS.some((m) => m.id === id);
 
-export async function getModelSettings(userId: string): Promise<ModelSettings> {
-  const db = await getDb();
-  const [row] = await db.select().from(schema.userSettings).where(eq(schema.userSettings.userId, userId));
-  return {
-    default: isModelId(row?.defaultModel) ? row.defaultModel : DEFAULT_MODELS.default,
-    builder: isModelId(row?.builderModel) ? row.builderModel : DEFAULT_MODELS.builder,
-  };
+/** The model for `role`: `CAPTAIN_CHAT_MODEL` / `CAPTAIN_BUILDER_MODEL` when set to a listed model, else the default. */
+export function serverModel(role: ModelRole): ModelId {
+  const id = process.env[ENV[role]];
+  if (id && !isModelId(id)) console.warn(`[models] ignoring ${ENV[role]}=${id}: not a listed model`);
+  return isModelId(id) ? id : DEFAULT_MODELS[role];
 }
 
-export async function saveModelSettings(userId: string, settings: ModelSettings): Promise<void> {
-  const db = await getDb();
-  const values = { defaultModel: settings.default, builderModel: settings.builder };
-  await db
-    .insert(schema.userSettings)
-    .values({ userId, ...values })
-    .onConflictDoUpdate({ target: schema.userSettings.userId, set: values });
-  modelCache.delete(userId);
-}
+/** Input price of `model` in USD per million tokens. */
+export const inputPrice = (model: ModelId) => MODELS.find((m) => m.id === model)?.input ?? 0;
 
-/** Bots resolve the model on every step, so cache each user's choice briefly instead of hitting the DB each time. */
-const modelCache = new Map<string, { settings: ModelSettings; expires: number }>();
-
-async function cachedModelSettings(userId: string): Promise<ModelSettings> {
-  const hit = modelCache.get(userId);
-  if (hit && hit.expires > Date.now()) return hit.settings;
-  const settings = await getModelSettings(userId);
-  modelCache.set(userId, { settings, expires: Date.now() + 15_000 });
-  return settings;
-}
-
-/** The model for `role` chosen by the session's Captain user. Changes in Settings apply from the next step. */
-export function userModel(role: ModelRole) {
+/** The model for `role`, resolved on every step so an env change applies without a rebuild of the agent. */
+export function roleModel(role: ModelRole) {
   return defineDynamic({
     events: {
       // Live LanguageModel objects (direct Anthropic via ANTHROPIC_API_KEY) are only allowed at step scope.
-      "step.started": async (_event, ctx) => {
-        const userId = ctx.session.auth.current?.principalId;
-        const settings = userId ? await cachedModelSettings(userId) : DEFAULT_MODELS;
-        return anthropic(settings[role]);
-      },
+      "step.started": async () => anthropic(serverModel(role)),
     },
   });
 }

@@ -1,5 +1,5 @@
-import { getModelSettings } from "@captain/core/models";
-import { assertWithinLimit, consumeRate, consumeUsage, recordTokens, refundUsage } from "@captain/core/usage";
+import { serverModel } from "@captain/core/models";
+import { assertWithinBudget, consumeRate, consumeUsage, recordCost, refundUsage } from "@captain/core/usage";
 import { APICallError, generateText, RetryError } from "ai";
 import { anthropic } from "eve/models/anthropic";
 import { z } from "zod";
@@ -31,11 +31,11 @@ export const POST = route(async (request: Request) => {
   const input = body.parse(await readJson(request));
   const app = await requireApp(user.id, input.appId);
   await consumeRate(user.id, "ai");
-  await assertWithinLimit(user.id, "tokens");
+  await assertWithinBudget(user.id);
   await consumeUsage(user.id, "ai");
-  // The user's default model from Settings → Models (`CAPTAIN_APP_MODEL` overrides it for every user).
-  // Direct Anthropic call via ANTHROPIC_API_KEY; anthropic() rejects non-Anthropic model IDs.
-  const model = anthropic(process.env.CAPTAIN_APP_MODEL || (await getModelSettings(user.id)).default);
+  // The chat model (`CAPTAIN_CHAT_MODEL`). Direct Anthropic call via ANTHROPIC_API_KEY.
+  const modelId = serverModel("default");
+  const model = anthropic(modelId);
   const system = [
     `You are the AI engine inside "${app.name}", a small app the user built: ${app.description}`,
     input.system,
@@ -61,17 +61,20 @@ export const POST = route(async (request: Request) => {
     } else {
       // Stopped part-way (the app went away, or it ran too long): the model did bill, but reported no
       // usage. Count the prompt and the most it could have written, so dropping connections can't dodge
-      // the daily budget.
-      await recordTokens(user.id, {
+      // the budget.
+      await recordCost(user.id, modelId, {
         inputTokens: Math.ceil((system.length + input.prompt.length) / 4),
         outputTokens: input.maxTokens ?? 4000,
-      }).catch((e: unknown) => console.error("[runtime/ai] couldn't record token usage", e));
+      }).catch((e: unknown) => console.error("[runtime/ai] couldn't record AI spend", e));
     }
     throw error;
   }
-  await recordTokens(user.id, { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens }).catch(
-    (error: unknown) => console.error("[runtime/ai] couldn't record token usage", error),
-  );
+  await recordCost(user.id, modelId, {
+    inputTokens: result.usage.inputTokens,
+    outputTokens: result.usage.outputTokens,
+    cacheReadTokens: result.usage.inputTokenDetails?.cacheReadTokens,
+    cacheWriteTokens: result.usage.inputTokenDetails?.cacheWriteTokens,
+  }).catch((error: unknown) => console.error("[runtime/ai] couldn't record AI spend", error));
 
   if (!input.json) return Response.json({ text: result.text });
   const object = parseJson(result.text);

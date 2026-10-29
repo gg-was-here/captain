@@ -3,7 +3,7 @@ import { eveChannel, type TrustedForwarders } from "eve/channels/eve";
 import type { SessionAuthContext } from "eve/context";
 import { captainAuth, clerkConfigured } from "./auth";
 import { mayUseSession } from "./session-owners";
-import { assertWithinLimit, consumeUsage, UsageLimitError } from "./usage";
+import { assertWithinBudget, consumeUsage, UsageLimitError } from "./usage";
 
 const isCaptainUser = (context: SessionAuthContext | undefined) =>
   context?.authenticator === "captain" &&
@@ -61,7 +61,7 @@ export async function modelWork(request: Request): Promise<"message" | "answers"
 
 /**
  * Captain user auth for browser and Mac app requests. A request for an existing session must come from
- * the user who started it. Anything that runs the model needs token budget left today (usage is counted
+ * the user who started it. Anything that runs the model needs AI budget left (spend is counted
  * by the `usage-meter` hook), and each message counts against the daily message limit.
  */
 function captainUserAuth(): AuthFn<Request> {
@@ -81,7 +81,7 @@ function captainUserAuth(): AuthFn<Request> {
     const work = await modelWork(request);
     if (work) {
       try {
-        await assertWithinLimit(result.principalId, "tokens");
+        await assertWithinBudget(result.principalId);
         if (work === "message") await consumeUsage(result.principalId, "messages");
       } catch (error) {
         if (error instanceof UsageLimitError) throw new ForbiddenError({ message: error.message });
