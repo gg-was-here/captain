@@ -2,7 +2,7 @@ import { A, LEGAL_CONTACT, LegalPage, List, Section, Sub } from "@/app/_componen
 
 export const metadata = { title: "Privacy Policy · Bambii" };
 
-const LAST_UPDATED = "October 29, 2026";
+const LAST_UPDATED = "November 3, 2026";
 const CONTACT = LEGAL_CONTACT;
 
 /**
@@ -217,7 +217,12 @@ export default function PrivacyPolicyPage() {
             a chat whose session has ended so you can still read it and continue it, until you delete the chat.
           </li>
           <li>
-            <strong>Apps</strong> are kept until you delete them.
+            <strong>Apps</strong>, including every version&apos;s code and build, are kept until you delete them.
+          </li>
+          <li>
+            <strong>Usage records</strong> (how many messages, builds and AI requests you used each day, and what they
+            cost) are kept until you delete your account, to enforce usage limits. Short-term counters that stop
+            runaway requests are cleared out regularly.
           </li>
           <li>
             <strong>Records of sent emails and posts</strong>, used to prevent sending the same thing twice, are
@@ -237,6 +242,7 @@ export default function PrivacyPolicyPage() {
       <Section title="Your choices and rights">
         <List>
           <li>Delete any chat or app, or your whole account, in the app (Settings → Account).</li>
+          <li>Download a copy of your chats, apps, settings and usage in Settings → Account.</li>
           <li>Disconnect Slack, Google or Notion at any time in Settings → Connections, or from that service.</li>
           <li>Update your name, email and sign-in methods in your account settings.</li>
         </List>
