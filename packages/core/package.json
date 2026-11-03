@@ -19,6 +19,7 @@
     "./channel": "./src/channel.ts",
     "./peers": "./src/peers.ts",
     "./usage": "./src/usage.ts",
+    "./alerts": "./src/alerts.ts",
     "./session-owners": "./src/session-owners.ts",
     "./models": "./src/models.ts"
   },

@@ -1,4 +1,5 @@
 import { and, eq, like, lt, sql } from "drizzle-orm";
+import { alert } from "./alerts";
 import { getDb, schema } from "./db";
 import { inputPrice, type ModelId } from "./models";
 
@@ -166,7 +167,33 @@ export async function recordCost(userId: string, model: ModelId, usage: TokenUsa
   const amount = costMicros(model, usage);
   if (amount <= 0) return;
   const day = today();
-  await Promise.all([add(userId, day, "cost", amount), add(EVERYONE, day, "cost", amount)]);
+  const [, allDay] = await Promise.all([add(userId, day, "cost", amount), add(EVERYONE, day, "cost", amount)]);
+  await alertOnSpend(allDay, amount);
+}
+
+/** Spend levels, as fractions of a deployment-wide budget, that alert the operator once crossed. */
+const SPEND_ALERTS = [0.5, 0.8, 1] as const;
+
+/** Alerts when this call pushed the deployment's daily or monthly spend past one of `SPEND_ALERTS`. */
+async function alertOnSpend(allDay: number, amount: number): Promise<void> {
+  const caps = budgets();
+  const crossed = (total: number, cap: number) =>
+    SPEND_ALERTS.filter((level) => total - amount < level * cap * MICROS && total >= level * cap * MICROS).at(-1);
+  const daily = crossed(allDay, caps.globalDaily);
+  if (daily !== undefined) {
+    await alert(`spend:day:${today()}:${daily}`, `AI spend today passed ${daily * 100}% of the daily budget`, {
+      spentUsd: (allDay / MICROS).toFixed(2),
+      budgetUsd: caps.globalDaily,
+    });
+  }
+  const allMonth = await usedThisMonth(EVERYONE, "cost");
+  const monthly = crossed(allMonth, caps.globalMonthly);
+  if (monthly !== undefined) {
+    await alert(`spend:month:${thisMonth()}:${monthly}`, `AI spend this month passed ${monthly * 100}% of the monthly budget`, {
+      spentUsd: (allMonth / MICROS).toFixed(2),
+      budgetUsd: caps.globalMonthly,
+    });
+  }
 }
 
 /**

@@ -1,9 +1,11 @@
 import "server-only";
+import { alert } from "@captain/core/alerts";
 import { type CaptainUser, resolveUser } from "@captain/core/auth";
 import { UpstreamError } from "@captain/core/connectors";
 import { UsageLimitError } from "@captain/core/usage";
 import { APICallError, RetryError } from "ai";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { ZodError } from "zod";
 
 export async function currentUser(request?: Request): Promise<CaptainUser | null> {
@@ -64,6 +66,14 @@ export function errorResponse(error: unknown, request?: Request): Response {
   const reference = request?.headers.get("x-vercel-id") ?? crypto.randomUUID();
   console.error(`[${reference}]`, error);
   const model = modelFailure(error);
+  // The operator hears about our failures and the AI service's, not about requests that were too long or slow.
+  if (!model || (model.status !== 400 && model.status !== 504)) {
+    alertAfterResponse(model ? "model-error" : "server-error", model ? "AI service calls are failing" : "A request failed with a server error", {
+      path: request ? new URL(request.url).pathname : undefined,
+      error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : String(error).slice(0, 300),
+      reference,
+    });
+  }
   if (model) return Response.json({ error: model.message, reference }, { status: model.status });
   return Response.json({ error: "Something went wrong. Please try again.", reference }, { status: 500 });
 }
@@ -83,4 +93,14 @@ function modelFailure(error: unknown): { status: number; message: string } | und
     return { status: 503, message: "The AI service is busy right now. Try again in a minute." };
   }
   return { status: 500, message: "Something went wrong with the AI service. Please try again later." };
+}
+
+/** Sends an alert once the response is out, so a slow webhook never delays the user. */
+function alertAfterResponse(...args: Parameters<typeof alert>): void {
+  try {
+    after(() => alert(...args));
+  } catch {
+    // Outside a request (a script or a test): send it now, without waiting.
+    void alert(...args);
+  }
 }
