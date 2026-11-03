@@ -34,7 +34,7 @@ import { ConnectPrompt } from "./connect-prompt";
 import { AppReadyCard, ThreadAppContext } from "./tool-results";
 import { LegalFooter } from "./legal";
 import { NewThreadMenu } from "./new-thread-dialog";
-import { avatarTint, BotGlyph } from "./bot-glyph";
+import { avatarSeedFor, avatarTint, BotGlyph, bubbleTint } from "./bot-glyph";
 
 export interface ChatBot {
   readonly agent: string;
@@ -89,8 +89,11 @@ export function AgentChat({
   panelToggle,
   title,
   archive,
+  avatarSeed,
 }: {
   readonly bot: ChatBot;
+  /** The bot's avatar seed, as the sidebar and side panel use it (Bambii chats are colored by thread instead). */
+  readonly avatarSeed: string;
   /** Name the user gave this thread; used instead of the first message as its title. */
   readonly title?: string;
   readonly threadId?: string;
@@ -108,6 +111,9 @@ export function AgentChat({
   readonly archive?: ChatArchive;
 }) {
   const AGENT_NAME = bot.name;
+  // One color for the chat's avatars and the user's bubbles, matching its row in the sidebar.
+  const colorSeed = avatarSeedFor(bot.icon, initialThreadId, avatarSeed);
+  const bubble = bubbleTint(bot.icon, colorSeed);
   const [cancellationError, setCancellationError] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
   /** A problem with what's in the composer (attachments), shown above it. */
@@ -444,9 +450,12 @@ export function AgentChat({
 
   return (
     <ThreadAppContext.Provider value={appId}>
-    <main className="relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
+    <main
+      className={cn("relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground", bubble.className)}
+      style={bubble.style}
+    >
       {showConversationLayout ? (
-        <ChatHeader bot={bot} threadId={initialThreadId} title={title} />
+        <ChatHeader bot={bot} colorSeed={colorSeed} title={title} />
       ) : null}
       {/* After the header: Electron resolves drag regions in DOM order, so a later drag region would swallow clicks. */}
       {panelToggle ? (
@@ -500,7 +509,7 @@ export function AgentChat({
             ))}
             {showLoader ? (
               <PendingThinking
-                threadId={initialThreadId}
+                colorSeed={colorSeed}
                 elapsedMs={replyTimer.elapsedMs}
                 icon={bot.icon}
                 label={activity}
@@ -769,14 +778,14 @@ function ErrorMessage({ message }: { readonly message: string }) {
 
 function ChatHeader({
   bot,
-  threadId,
+  colorSeed,
   title,
 }: {
   readonly bot: ChatBot;
-  readonly threadId?: string;
+  readonly colorSeed?: string;
   readonly title?: string;
 }) {
-  const tint = avatarTint(bot.icon, threadId);
+  const tint = avatarTint(bot.icon, colorSeed);
   return (
     <header className="pointer-events-none absolute top-0 right-0 left-0 z-20 flex h-14 items-center justify-center [-webkit-app-region:drag]">
       {/* A floating pill with the chat's avatar and name, as in a messaging app. */}
@@ -819,16 +828,16 @@ function PendingThinking({
   label,
   elapsedMs,
   typicalMs,
-  threadId,
+  colorSeed,
 }: {
   readonly icon: string;
   readonly label: Activity;
   readonly elapsedMs?: number;
   readonly typicalMs?: number;
-  /** Colors Bambii's fawn to match this chat. */
-  readonly threadId?: string;
+  /** Colors the avatar to match this chat (see `avatarSeedFor`). */
+  readonly colorSeed?: string;
 }) {
-  const tint = avatarTint(icon, threadId);
+  const tint = avatarTint(icon, colorSeed);
   return (
     <Message from="assistant">
       <MessageContent>

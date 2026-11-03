@@ -1,7 +1,7 @@
 import { SYSTEM_BOTS } from "@captain/core/bots";
 import type { CSSProperties } from "react";
 import { BambiiLogo } from "@/components/bambii-logo";
-import { avatarColor, fawnStyle } from "@/lib/utils";
+import { avatarColor, avatarColorName, fawnStyle } from "@/lib/utils";
 
 /** The Bambii bot's emoji in its settings; on screen it's drawn as the fawn logo instead. */
 const BAMBII_ICON = SYSTEM_BOTS.find((bot) => bot.agent === "captain")?.icon;
@@ -20,4 +20,28 @@ export function BotGlyph({ icon }: { readonly icon: string }) {
 export function avatarTint(icon: string, seed: string | null | undefined): { className: string; style?: CSSProperties } {
   if (!isBambiiIcon(icon)) return { className: avatarColor(seed ?? "") };
   return seed ? { className: "fawn-avatar", style: fawnStyle(seed) } : { className: "bg-muted text-foreground" };
+}
+
+/** The seed that colors a chat's avatar, as the sidebar picks it: the thread for Bambii, the bot (and app) otherwise. */
+export function avatarSeedFor(icon: string, threadId: string | null | undefined, botSeed: string): string | undefined {
+  return isBambiiIcon(icon) ? (threadId ?? undefined) : botSeed;
+}
+
+/**
+ * Colors for the user's message bubbles, matching the chat's avatar (see `avatarTint`). Set on the chat as
+ * `--user-bubble` / `--user-bubble-fg`, which `MessageContent` reads.
+ */
+export function bubbleTint(icon: string, seed: string | null | undefined): { className?: string; style: CSSProperties } {
+  if (isBambiiIcon(icon)) {
+    if (seed) return { className: "fawn-bubble", style: fawnStyle(seed) };
+    return { style: { "--user-bubble": "var(--muted)", "--user-bubble-fg": "var(--foreground)" } as CSSProperties };
+  }
+  // The avatar is the color at 15% over the page; the bubble is the same mix, made opaque.
+  const color = avatarColorName(seed ?? "");
+  return {
+    style: {
+      "--user-bubble": `color-mix(in oklab, var(--color-${color}-500) 15%, var(--background))`,
+      "--user-bubble-fg": "var(--foreground)",
+    } as CSSProperties,
+  };
 }

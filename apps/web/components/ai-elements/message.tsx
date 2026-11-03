@@ -35,8 +35,9 @@ export const MessageContent = ({ children, className, ...props }: MessageContent
   <div
     className={cn(
       "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
-      // Chat-app bubbles: the user's are teal on the right.
-      "group-[.is-user]:ml-auto group-[.is-user]:max-w-[75%] group-[.is-user]:rounded-[18px] group-[.is-user]:bg-teal-600 group-[.is-user]:px-3.5 group-[.is-user]:py-2 group-[.is-user]:text-white",
+      // Chat-app bubbles: the user's are on the right, in the chat's avatar colors (`--user-bubble`, set by
+      // the chat; teal without one).
+      "group-[.is-user]:ml-auto group-[.is-user]:max-w-[75%] group-[.is-user]:rounded-[18px] group-[.is-user]:bg-[color:var(--user-bubble,oklch(0.6_0.118_184.704))] group-[.is-user]:px-3.5 group-[.is-user]:py-2 group-[.is-user]:text-[color:var(--user-bubble-fg,white)]",
       // Streamdown links default to text-primary, which matches the user bubble background.
       "group-[.is-user]:[&_[data-streamdown=link]]:text-current",
       "group-[.is-assistant]:w-full group-[.is-assistant]:text-foreground",

@@ -70,6 +70,7 @@ export function ThreadView({
       <AgentChat
         appId={appId}
         archive={archive}
+        avatarSeed={bot.agent + (appId ?? spaceApp?.id ?? "")}
         bot={bot}
         instructions={instructions}
         key={`${bot.agent}:${initialThreadId ?? "new"}:${appId ?? ""}`}
