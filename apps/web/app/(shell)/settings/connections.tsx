@@ -12,7 +12,7 @@ type Connection = { name: string; label: string; status: "connected" | "disconne
 
 const DESCRIPTIONS: Record<string, string> = {
   slack: "Lets the Slack bot and your apps search, read and (with approval) post messages as you.",
-  google: "Lets the Gmail bot and your apps search, read and draft email.",
+  google: "Lets the Gmail bot and your apps search, read and draft email, and (with approval) send it as you.",
   notion: "Lets the Notion bot find, read and edit your pages and databases.",
 };
 
