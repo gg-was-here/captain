@@ -24,6 +24,17 @@ const isDev = () =>
 
 export const clerkConfigured = () => Boolean(process.env.CLERK_SECRET_KEY);
 
+/**
+ * Sites whose Clerk sessions this deployment accepts, checked against the token's `azp` claim, so a
+ * token minted for another site on the same Clerk instance doesn't work here. Production defaults to
+ * bambii.ai; set `CAPTAIN_AUTHORIZED_ORIGINS` (comma-separated) to change it. Unchecked elsewhere.
+ */
+export function authorizedParties(): string[] | undefined {
+  const configured = process.env.CAPTAIN_AUTHORIZED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean);
+  if (configured?.length) return configured;
+  return process.env.VERCEL_ENV === "production" ? ["https://bambii.ai", "https://www.bambii.ai"] : undefined;
+}
+
 function sessionToken(request: Request): string | undefined {
   const header = request.headers.get("authorization");
   if (header?.toLowerCase().startsWith("bearer ")) return header.slice(7).trim();
@@ -36,7 +47,7 @@ export async function resolveUser(request: Request): Promise<CaptainUser | null>
   const token = sessionToken(request);
   if (!token) return null;
   try {
-    const claims = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY! });
+    const claims = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY!, authorizedParties: authorizedParties() });
     return {
       id: claims.sub,
       email: typeof claims.email === "string" ? claims.email : undefined,
