@@ -12,7 +12,7 @@
  */
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type BrowserWindow, dialog, ipcMain, net, protocol, session, shell, WebContentsView } from "electron";
+import { app, type BrowserWindow, dialog, ipcMain, net, protocol, session, shell, WebContentsView } from "electron";
 import * as store from "./store";
 
 export const APP_SCHEME = "captain-app";
@@ -139,6 +139,7 @@ export class SpaceManager {
         session: appSessionReady,
         sandbox: true,
         contextIsolation: true,
+        devTools: !app.isPackaged,
         additionalArguments: [`--captain-app=${JSON.stringify({ id: appId, name: manifest.name, version })}`],
       },
     });
@@ -161,7 +162,7 @@ export class SpaceManager {
       if (generation === this.generation) throw error;
       return;
     }
-    if (process.env.CAPTAIN_DEBUG_CAPTURE) void debugCapture(this.window, view, process.env.CAPTAIN_DEBUG_CAPTURE);
+    if (!app.isPackaged && process.env.CAPTAIN_DEBUG_CAPTURE) void debugCapture(this.window, view, process.env.CAPTAIN_DEBUG_CAPTURE);
   }
 
   setBounds(bounds: Bounds) {

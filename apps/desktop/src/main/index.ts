@@ -8,9 +8,10 @@ import { deepLinkPath, isExternalUrl, mayShowInWindow } from "./urls";
 
 /**
  * The Captain web app this shell wraps: `captainUrl` in package.json for
- * release builds, `CAPTAIN_URL=http://localhost:3000` for local dev.
+ * release builds, `CAPTAIN_URL=http://localhost:3000` for local dev. Packaged
+ * builds ignore the override, so nobody can point a user's app at another site.
  */
-const ORIGIN = new URL(process.env.CAPTAIN_URL ?? require("../../package.json").captainUrl).origin;
+const ORIGIN = new URL((!app.isPackaged && process.env.CAPTAIN_URL) || require("../../package.json").captainUrl).origin;
 
 // The app is called Bambii, but its data (installed apps, sign-in) stays in the folder it had as Captain.
 app.setPath("userData", join(app.getPath("appData"), "Captain"));
@@ -58,7 +59,7 @@ function failurePage(target: string, reason: string) {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
+function createWindow(startPath = (!app.isPackaged && process.env.CAPTAIN_START_PATH) || "/") {
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -72,6 +73,7 @@ function createWindow(startPath = process.env.CAPTAIN_START_PATH ?? "/") {
       preload: join(__dirname, "..", "preload", "index.js"),
       contextIsolation: true,
       sandbox: true,
+      devTools: !app.isPackaged,
     },
   });
   mainWindow = window;
@@ -224,7 +226,13 @@ app.whenReady().then(() => {
       { role: "editMenu" },
       {
         label: "View",
-        submenu: [{ role: "reload" }, { role: "toggleDevTools" }, { type: "separator" }, { role: "togglefullscreen" }],
+        // DevTools only in development: in a release they'd let anyone poke at a signed-in session.
+        submenu: [
+          { role: "reload" },
+          ...(app.isPackaged ? [] : [{ role: "toggleDevTools" } as const]),
+          { type: "separator" },
+          { role: "togglefullscreen" },
+        ],
       },
       { role: "windowMenu" },
     ]),

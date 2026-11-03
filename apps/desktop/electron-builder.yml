@@ -6,6 +6,17 @@ directories:
 files:
   - dist/**
   - package.json
+# Electron fuses, flipped in the binary at package time: the app can't be run as plain Node, ignores
+# NODE_OPTIONS and --inspect, only loads its own code from the checksummed app.asar, encrypts cookies, and
+# gives file:// pages no special powers (nothing is served from file://).
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 protocols:
   - name: Bambii
     schemes: [captain]
