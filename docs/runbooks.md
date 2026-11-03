@@ -64,7 +64,7 @@ Set the new value in Vercel's Production environment, redeploy, then revoke the 
 
 ## Changing a connector's Vercel Connect registration
 
-Connector IDs default to `slack/captain`, `google/captain` and `notion/notion`, and can be overridden with
+Connector IDs default to `slack/captain`, `google/coral-carbambii` and `notion/notion`, and can be overridden with
 `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`.
 
 - **Scopes change** (in `packages/core/src/connectors/index.ts`): update the registration in Vercel

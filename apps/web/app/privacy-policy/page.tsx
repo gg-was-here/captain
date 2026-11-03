@@ -80,7 +80,7 @@ export default function PrivacyPolicyPage() {
               and direct messages you can access, list channels, and post messages as you.
             </li>
             <li>
-              <strong>Google (Gmail).</strong> Permission to read and modify your Gmail and to compose email. Bambii
+              <strong>Google (Gmail).</strong> Permission to read your Gmail (but not change or delete it) and to compose email. Bambii
               uses it to search and read your email, create drafts, and send email you&apos;ve approved.
             </li>
             <li>

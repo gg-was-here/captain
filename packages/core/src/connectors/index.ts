@@ -20,9 +20,10 @@ export const CONNECTORS = {
   },
   google: {
     label: "Google Workspace",
-    uid: process.env.CONNECT_GOOGLE ?? "google/captain",
+    uid: process.env.CONNECT_GOOGLE ?? "google/coral-carbambii",
     scopes: [
-      "https://www.googleapis.com/auth/gmail.modify",
+      // Read-only access to search and read; compose to create drafts and send. No changing or deleting mail.
+      "https://www.googleapis.com/auth/gmail.readonly",
       "https://www.googleapis.com/auth/gmail.compose",
     ],
   },
