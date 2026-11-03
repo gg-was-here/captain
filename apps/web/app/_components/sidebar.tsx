@@ -2,7 +2,7 @@
 
 import { SYSTEM_BOTS } from "@captain/core/bots";
 import type { App, Thread } from "@captain/core/schema";
-import { PanelLeftCloseIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { PanelLeftCloseIcon, SearchIcon, SettingsIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,7 +32,6 @@ export function Sidebar() {
   const mobile = useIsMobile();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [apps, setApps] = useState<App[]>([]);
-  const [initials, setInitials] = useState("");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string>();
@@ -60,20 +59,6 @@ export function Sidebar() {
 
   useEffect(() => {
     void load();
-    void fetch("/api/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((body) => {
-        const name: string = body?.user?.name ?? body?.user?.email ?? "Me";
-        setInitials(
-          name
-            .split(/[\s@.]+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase())
-            .join(""),
-        );
-      });
     return onRefreshSidebar(() => void load());
   }, [load]);
 
@@ -248,13 +233,14 @@ export function Sidebar() {
           <Link
             aria-label="Settings"
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full border bg-background font-medium text-xs transition-colors hover:bg-accent",
-              pathname === "/settings" && "bg-accent",
+              roundButton,
+              "shrink-0",
+              pathname === "/settings" && "bg-accent text-foreground",
             )}
             href="/settings"
             title="Settings"
           >
-            {initials}
+            <SettingsIcon className="size-4" />
           </Link>
           <Link
             className={cn(
