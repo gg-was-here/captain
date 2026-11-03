@@ -28,13 +28,16 @@ export function avatarSeedFor(icon: string, threadId: string | null | undefined,
 }
 
 /**
- * Colors for the user's message bubbles, matching the chat's avatar (see `avatarTint`). Set on the chat as
- * `--user-bubble` / `--user-bubble-fg`, which `MessageContent` reads.
+ * Colors for the chat's message bubbles, matching its avatar (see `avatarTint`): the user's in the avatar's
+ * colors, the bot's in a light tint of them. Set on the chat as `--user-bubble` / `--user-bubble-fg`, read
+ * by `MessageContent`, and `--bot-bubble`, read by the bot's text bubbles.
  */
 export function bubbleTint(icon: string, seed: string | null | undefined): { className?: string; style: CSSProperties } {
   if (isBambiiIcon(icon)) {
     if (seed) return { className: "fawn-bubble", style: fawnStyle(seed) };
-    return { style: { "--user-bubble": "var(--muted)", "--user-bubble-fg": "var(--foreground)" } as CSSProperties };
+    return {
+      style: { "--user-bubble": "var(--muted)", "--user-bubble-fg": "var(--foreground)", "--bot-bubble": "var(--muted)" } as CSSProperties,
+    };
   }
   // The avatar is the color at 15% over the page; the bubble is the same mix, made opaque.
   const color = avatarColorName(seed ?? "");
@@ -42,6 +45,7 @@ export function bubbleTint(icon: string, seed: string | null | undefined): { cla
     style: {
       "--user-bubble": `color-mix(in oklab, var(--color-${color}-500) 15%, var(--background))`,
       "--user-bubble-fg": "var(--foreground)",
+      "--bot-bubble": `color-mix(in oklab, var(--color-${color}-500) 6%, var(--muted))`,
     } as CSSProperties,
   };
 }

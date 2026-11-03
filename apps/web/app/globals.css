@@ -79,10 +79,11 @@
   color: var(--fawn-fg);
 }
 
-/* Set on a Bambii chat: the user's bubbles take its fawn's colors (read by MessageContent). */
+/* Set on a Bambii chat: the user's bubbles take its fawn's colors (read by MessageContent), the bot's a light tint. */
 .fawn-bubble {
   --user-bubble: var(--fawn-bg);
   --user-bubble-fg: var(--fawn-fg);
+  --bot-bubble: color-mix(in oklab, var(--fawn-bg) 40%, var(--muted));
 }
 
 /* Not inline: font utilities must read the variables so each host's font loader can override them. */

@@ -113,7 +113,7 @@ function AgentMessagePart({
       if (!textBubble) return response;
       if (!part.text) return null;
       return (
-        <div className="w-fit max-w-[75%] rounded-[18px] bg-muted px-3.5 py-2 text-foreground">
+        <div className="w-fit max-w-[75%] rounded-[18px] bg-[color:var(--bot-bubble,var(--muted))] px-3.5 py-2 text-foreground">
           {response}
         </div>
       );
