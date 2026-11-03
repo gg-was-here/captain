@@ -18,7 +18,7 @@ import { inputPrice, type ModelId } from "./models";
 const DAILY = { messages: 200, ai: 500, builds: 20, connector: 1000 } as const;
 
 /** Per-minute caps that stop runaway loops in built apps or scripts. Override with `CAPTAIN_MINUTE_<KIND>_LIMIT`. */
-const PER_MINUTE = { ai: 20, connector: 60, handoff: 5 } as const;
+const PER_MINUTE = { ai: 20, connector: 60, handoff: 5, export: 2 } as const;
 
 /**
  * Model spend caps in USD, per user and for the whole deployment, per UTC day and month. Override with

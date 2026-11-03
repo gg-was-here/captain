@@ -13,6 +13,26 @@ export function Account() {
   const { signOut } = useClerk();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string>();
+
+  // Fetched rather than linked, so a failure shows here instead of replacing the page with JSON.
+  const exportData = async () => {
+    setExporting(true);
+    setExportError(undefined);
+    try {
+      const response = await api("/api/me?export", undefined, "Couldn't export your data.");
+      const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1] ?? "bambii-export.json";
+      const url = URL.createObjectURL(await response.blob());
+      const link = Object.assign(document.createElement("a"), { href: url, download: name });
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setExportError(errorText(e, "Couldn't export your data."));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
@@ -54,6 +74,23 @@ export function Account() {
         </Button>
         <Button onClick={() => void signOut({ redirectUrl: "/sign-in" })} size="sm" variant="ghost">
           Sign out
+        </Button>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">Download your data</div>
+          <p className="mt-0.5 text-muted-foreground text-sm">Your chats, apps (with their code), settings and usage, as one JSON file.</p>
+          {exportError ? <p className="mt-1 text-destructive text-sm">{exportError}</p> : null}
+        </div>
+        <Button disabled={exporting} onClick={() => void exportData()} size="sm" variant="outline">
+          {exporting ? (
+            <>
+              <Spinner className="size-3.5" />
+              Preparing…
+            </>
+          ) : (
+            "Download"
+          )}
         </Button>
       </div>
       <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
