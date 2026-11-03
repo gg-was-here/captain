@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { del, get, list, put } from "@vercel/blob";
 import { localDataDir } from "./db-url";
+import { requireInProduction } from "./env";
 
 /**
  * An app bundle is everything the desktop app needs to store and run an app
@@ -23,7 +24,11 @@ export interface AppBundle {
   assets?: Record<string, string>;
 }
 
-const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+/** Blob when configured, files under `.data/` otherwise. Production must use Blob: its disk doesn't last. */
+const useBlob = () => {
+  requireInProduction("BLOB_READ_WRITE_TOKEN");
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+};
 
 export function bundleKey(appId: string, version: number) {
   return `apps/${appId}/v${version}.json`;

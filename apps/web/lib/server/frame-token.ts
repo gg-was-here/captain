@@ -9,10 +9,17 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  */
 const TTL_MS = 12 * 60 * 60 * 1000;
 
-// Falls back to a per-process secret in local dev; tokens then reset on restart.
-const secret = process.env.CAPTAIN_SIGNING_SECRET || process.env.CLERK_SECRET_KEY || randomBytes(32).toString("hex");
+/**
+ * `CAPTAIN_SIGNING_SECRET`, or until that's set, a key derived from Clerk's secret (never the Clerk key
+ * itself). Falls back to a per-process secret in local dev; tokens then reset on restart.
+ */
+const secret =
+  process.env.CAPTAIN_SIGNING_SECRET ||
+  (process.env.CLERK_SECRET_KEY && createHmac("sha256", process.env.CLERK_SECRET_KEY).update("captain frame-token key").digest()) ||
+  randomBytes(32);
 
-const sign = (payload: string) => createHmac("sha256", secret).update(payload).digest("base64url");
+/** Signs `frame-token:v1.<payload>`, so this signature can't be mistaken for one made for another purpose. */
+const sign = (payload: string) => createHmac("sha256", secret).update(`frame-token:v1.${payload}`).digest("base64url");
 
 export function signFrameToken(userId: string, appId: string): string {
   const payload = Buffer.from(JSON.stringify({ u: userId, a: appId, e: Date.now() + TTL_MS })).toString("base64url");

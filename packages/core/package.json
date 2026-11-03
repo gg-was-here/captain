@@ -20,6 +20,7 @@
     "./peers": "./src/peers.ts",
     "./usage": "./src/usage.ts",
     "./alerts": "./src/alerts.ts",
+    "./env": "./src/env.ts",
     "./session-owners": "./src/session-owners.ts",
     "./models": "./src/models.ts"
   },
