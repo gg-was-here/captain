@@ -66,11 +66,18 @@ TURSO_AUTH_TOKEN=
    - Turso: `TURSO_DATABASE_URL` (or `DATABASE_URL`), `TURSO_AUTH_TOKEN`
    - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
    - Vercel Blob: `BLOB_READ_WRITE_TOKEN`
-   - Optional: `CAPTAIN_SIGNING_SECRET` signs web-preview URLs for built apps (defaults to `CLERK_SECRET_KEY`).
+   - Anthropic: `ANTHROPIC_API_KEY`
+   - Secrets you generate (`openssl rand -hex 32`): `CAPTAIN_SIGNING_SECRET` signs web-preview URLs for built apps (until it's set, a key derived from `CLERK_SECRET_KEY` is used), and `CRON_SECRET` authorizes the daily chat-archive job.
+   - Clerk webhook: `CLERK_WEBHOOK_SIGNING_SECRET`, for `user.deleted` events sent to `/api/webhooks/clerk`.
+   - Optional: `CAPTAIN_ALERT_WEBHOOK_URL`, a Slack or Discord incoming webhook for error and spend alerts.
+
+   In production, a missing Turso URL or Blob token stops the app instead of falling back to local files. `/api/health` reports `"config": "incomplete"` when any of the variables above is missing, and the alert names which.
    - Optional per-user daily limits: `CAPTAIN_DAILY_MESSAGES_LIMIT` (default 200 messages to bots), `CAPTAIN_DAILY_AI_LIMIT` (500 AI calls from apps), `CAPTAIN_DAILY_BUILDS_LIMIT` (20 new apps).
 
    `vercel env pull` also points local dev at the production Turso database. To keep local data separate, use the `.env.development.local` above.
 4. **Deploy:** run `vercel deploy`. `withEve` deploys the web app and every bot as one project.
+
+For operating production (schema changes, rotating secrets, Mac releases, incidents), see [docs/runbooks.md](docs/runbooks.md).
 
 ### Ship the Mac app
 Set `captainUrl` in `apps/desktop/package.json` to your deployment URL. Then build:
