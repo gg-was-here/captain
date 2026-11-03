@@ -129,6 +129,12 @@ export const threadArchives = sqliteTable("thread_archives", {
   savedAt: timestamps.updatedAt,
 });
 
+/** Everyone with a place under the user cap (see `members.ts`). */
+export const members = sqliteTable("members", {
+  userId: text("user_id").primaryKey(),
+  joinedAt: integer("joined_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 /** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
 export const userSettings = sqliteTable("user_settings", {
   userId: text("user_id").primaryKey(),

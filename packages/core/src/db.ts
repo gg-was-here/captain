@@ -21,6 +21,8 @@ function createDb() {
 async function migrate(client: ReturnType<typeof createClient>) {
   // Owners for sessions that predate them are filled in once, when their table is first created.
   const ownersTable = await client.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_owners'");
+  // Likewise, everyone already using Bambii becomes a member when the user cap's table is first created.
+  const membersTable = await client.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'members'");
   if (databaseUrl().startsWith("file:")) {
     // Local dev: the web server and every bot server share this file. WAL lets readers and a writer
     // overlap; the client's `timeout` waits for another process's write instead of failing with SQLITE_BUSY.
@@ -62,6 +64,16 @@ async function migrate(client: ReturnType<typeof createClient>) {
         ? [
             `INSERT OR IGNORE INTO session_owners (session_id, user_id, agent, created_at)
               SELECT session_id, user_id, 'unknown', created_at FROM threads WHERE session_id IS NOT NULL ORDER BY created_at`,
+          ]
+        : []),
+      `CREATE TABLE IF NOT EXISTS members (user_id TEXT PRIMARY KEY, joined_at INTEGER NOT NULL)`,
+      ...(membersTable.rows.length === 0
+        ? [
+            `INSERT OR IGNORE INTO members (user_id, joined_at)
+              SELECT user_id, min(created_at) FROM (
+                SELECT user_id, created_at FROM threads UNION ALL SELECT user_id, created_at FROM apps
+                UNION ALL SELECT user_id, created_at FROM user_settings UNION ALL SELECT user_id, created_at FROM session_owners
+              ) GROUP BY user_id`,
           ]
         : []),
     ],

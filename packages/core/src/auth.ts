@@ -8,6 +8,7 @@
  */
 import { verifyToken } from "@clerk/backend";
 import type { AuthFn } from "eve/channels/auth";
+import { admit } from "./members";
 
 export interface CaptainUser {
   id: string;
@@ -42,7 +43,8 @@ function sessionToken(request: Request): string | undefined {
   return cookie.match(/(?:^|;\s*)__session=([^;]+)/)?.[1];
 }
 
-export async function resolveUser(request: Request): Promise<CaptainUser | null> {
+/** The signed-in user, whether or not they have a place under the user cap. */
+export async function signedInUser(request: Request): Promise<CaptainUser | null> {
   if (!clerkConfigured()) return isDev() ? LOCAL_USER : null;
   const token = sessionToken(request);
   if (!token) return null;
@@ -56,6 +58,13 @@ export async function resolveUser(request: Request): Promise<CaptainUser | null>
   } catch {
     return null;
   }
+}
+
+/** The signed-in user, if they have a place under the user cap (see `members.ts`); people on the waitlist get `null`. */
+export async function resolveUser(request: Request): Promise<CaptainUser | null> {
+  const user = await signedInUser(request);
+  if (!user || !clerkConfigured()) return user;
+  return (await admit(user.id)) ? user : null;
 }
 
 /** The time zone the web app sends with each bot request (`x-captain-time-zone`), if it's a real one. */

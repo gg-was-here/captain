@@ -1,6 +1,6 @@
 import "server-only";
 import { alert } from "@captain/core/alerts";
-import { type CaptainUser, resolveUser } from "@captain/core/auth";
+import { type CaptainUser, resolveUser, signedInUser } from "@captain/core/auth";
 import { UpstreamError } from "@captain/core/connectors";
 import { UsageLimitError } from "@captain/core/usage";
 import { APICallError, RetryError } from "ai";
@@ -8,9 +8,17 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { ZodError } from "zod";
 
+const asRequest = async (request?: Request) => request ?? new Request("http://captain.local", { headers: await headers() });
+
+/** The signed-in user, or `null` when signed out or on the waitlist (see `@captain/core/members`). */
 export async function currentUser(request?: Request): Promise<CaptainUser | null> {
-  if (request) return resolveUser(request);
-  return resolveUser(new Request("http://captain.local", { headers: await headers() }));
+  return resolveUser(await asRequest(request));
+}
+
+/** Whether the request is from someone signed in but on the waitlist, past the user cap. */
+export async function isWaitlisted(request?: Request): Promise<boolean> {
+  const req = await asRequest(request);
+  return Boolean(await signedInUser(req)) && !(await resolveUser(req));
 }
 
 export class HttpError extends Error {
@@ -24,7 +32,10 @@ export class HttpError extends Error {
 
 export async function requireUser(request?: Request): Promise<CaptainUser> {
   const user = await currentUser(request);
-  if (!user) throw new HttpError(401, "Sign in to Bambii");
+  if (!user) {
+    if (await isWaitlisted(request)) throw new HttpError(403, "Bambii is full right now. You're on the waitlist.");
+    throw new HttpError(401, "Sign in to Bambii");
+  }
   return user;
 }
 

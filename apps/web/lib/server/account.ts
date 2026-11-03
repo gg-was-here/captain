@@ -3,6 +3,7 @@ import { connectSubject } from "@captain/core/auth";
 import { deleteAppBundles } from "@captain/core/bundles";
 import { CONNECTOR_NAMES, CONNECTORS } from "@captain/core/connectors";
 import { getDb, schema } from "@captain/core/db";
+import { removeMember } from "@captain/core/members";
 import { revokeToken } from "@vercel/connect";
 import { eq, inArray } from "drizzle-orm";
 import { AGENTS, endSession } from "./sessions";
@@ -77,4 +78,6 @@ export async function deleteAccountData(userId: string, origin: string, cookie?:
     db.delete(schema.sentActions).where(eq(schema.sentActions.userId, userId)),
     db.delete(schema.threadArchives).where(eq(schema.threadArchives.userId, userId)),
   ]);
+  // Last, so the place under the user cap frees up only once everything else is gone.
+  await removeMember(userId);
 }

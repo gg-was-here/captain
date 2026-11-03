@@ -22,7 +22,8 @@
     "./alerts": "./src/alerts.ts",
     "./env": "./src/env.ts",
     "./session-owners": "./src/session-owners.ts",
-    "./models": "./src/models.ts"
+    "./models": "./src/models.ts",
+    "./members": "./src/members.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.25.0",
