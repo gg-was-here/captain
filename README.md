@@ -61,7 +61,7 @@ TURSO_AUTH_TOKEN=
    - `vercel connect create https://mcp.notion.com/mcp`
    - Register a Google OAuth client with `vercel connect create`, allowing the `gmail.readonly` and `gmail.compose` scopes.
 
-   If the generated IDs differ from `slack/captain`, `google/coral-carbambii` and `notion/notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`.
+   If the generated IDs differ from `slack/emerald-door`, `google/coral-carbambii` and `notion/notion`, set `CONNECT_SLACK`, `CONNECT_GOOGLE` and `CONNECT_NOTION`.
 3. **Production services** (Vercel Marketplace):
    - Turso: `TURSO_DATABASE_URL` (or `DATABASE_URL`), `TURSO_AUTH_TOKEN`
    - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`

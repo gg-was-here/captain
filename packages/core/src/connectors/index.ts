@@ -15,7 +15,7 @@ export { ConnectorAuthError, UpstreamError } from "./http";
 export const CONNECTORS = {
   slack: {
     label: "Slack",
-    uid: process.env.CONNECT_SLACK ?? "slack/captain",
+    uid: process.env.CONNECT_SLACK ?? "slack/emerald-door",
     scopes: ["search:read", "channels:history", "groups:history", "im:history", "channels:read", "groups:read", "chat:write"],
   },
   google: {
