@@ -1,4 +1,8 @@
 import { listWebRecords, onAppDataChanged, putWebRecord, removeWebRecord } from "./app-data";
+import { WriteGuard } from "./write-guard";
+
+/** Shared by every bridge on the page, so an app can't reset it by reloading into a fresh frame. */
+const writeGuard = new WriteGuard();
 
 /**
  * The Bambii-page half of the web preview's `window.captain` bridge (the app half is injected by
@@ -27,9 +31,11 @@ export function serveAppBridge(
     });
     const json = await response.json().catch(() => ({ error: response.statusText }));
     if (response.status === 409 && json.needsConfirmation) {
-      if (!window.confirm(`${json.summary}\n\n${json.text ?? JSON.stringify(json.details, null, 2)}`)) {
-        throw new Error("Cancelled by user");
-      }
+      const refusal = writeGuard.refusal(app.id, app.name);
+      if (refusal) throw new Error(refusal);
+      const allowed = window.confirm(`${json.summary}\n\n${json.text ?? JSON.stringify(json.details, null, 2)}`);
+      writeGuard.answered(app.id, allowed);
+      if (!allowed) throw new Error("Cancelled by user");
       return runtime(kind, body, true);
     }
     if (!response.ok) throw new Error(json.error ?? `Request failed (${response.status})`);

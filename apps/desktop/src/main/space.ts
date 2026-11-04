@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { app, type BrowserWindow, dialog, ipcMain, net, protocol, session, shell, WebContentsView } from "electron";
 import * as store from "./store";
+import { WriteGuard } from "./write-guard";
 
 export const APP_SCHEME = "captain-app";
 
@@ -107,6 +108,8 @@ export class SpaceManager {
   private appId?: string;
   /** Increments on every open/close so a superseded open stops quietly. */
   private generation = 0;
+  /** Cooldowns after the user cancels an app's send/post requests, for the life of this window. */
+  private readonly writeGuard = new WriteGuard();
 
   constructor(
     private readonly window: BrowserWindow,
@@ -245,6 +248,10 @@ export class SpaceManager {
     });
     const json = await response.json().catch(() => ({ error: response.statusText }));
     if (response.status === 409 && json.needsConfirmation) {
+      const appId = String(body.appId);
+      const appName = (await store.readManifest(appId).catch(() => null))?.name ?? "This app";
+      const refusal = this.writeGuard.refusal(appId, appName);
+      if (refusal) throw new Error(refusal);
       const { response: choice } = await dialog.showMessageBox(this.window, {
         type: "warning",
         buttons: ["Allow", "Cancel"],
@@ -253,6 +260,7 @@ export class SpaceManager {
         message: json.summary,
         detail: json.text ?? JSON.stringify(json.details, null, 2),
       });
+      this.writeGuard.answered(appId, choice === 0);
       if (choice !== 0) throw new Error("Cancelled by user");
       return this.runtimeCall(kind, body, true);
     }
