@@ -8,6 +8,15 @@ delete process.env.DATABASE_URL;
 delete process.env.TURSO_DATABASE_URL;
 
 const members = await import("./members");
+const { resetAlerts } = await import("./alerts");
+
+/** The waitlist alerts logged so far, as `[user, waiting]`. */
+const waitlistAlerts = (spy: ReturnType<typeof vi.spyOn>) =>
+  spy.mock.calls
+    .filter((call) => call[0] === "[alert]")
+    .map((call) => JSON.parse(String(call[1])))
+    .filter((alert) => alert.key.startsWith("waitlist:"))
+    .map((alert) => [alert.user, alert.waiting]);
 
 describe("user cap", () => {
   afterEach(() => {
@@ -57,5 +66,40 @@ describe("user cap", () => {
     const results = await Promise.all(Array.from({ length: 10 }, (_, i) => members.admit(`rush_${i}`)));
     // Four members already, so four places left.
     expect(results.filter(Boolean)).toHaveLength(4);
+  });
+
+  it("alerts once per person who lands on the waitlist", async () => {
+    resetAlerts();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Eight members, all places taken.
+    vi.stubEnv("CAPTAIN_MAX_USERS", "8");
+    expect(await members.admit("early_a")).toBe(true);
+    expect(await members.admit("waiting_1", "one@example.com")).toBe(false);
+    // Coming back, even after the alert throttle is forgotten (another server instance), doesn't alert again.
+    resetAlerts();
+    expect(await members.admit("waiting_1", "one@example.com")).toBe(false);
+    expect(await members.admit("waiting_2")).toBe(false);
+    const alerts = waitlistAlerts(errors);
+    expect(alerts.map(([user]) => user)).toEqual(["one@example.com", "waiting_2"]);
+    // The count of people waiting goes up by one with each.
+    expect(alerts[1][1]).toBe(alerts[0][1] + 1);
+    errors.mockRestore();
+  });
+
+  it("takes people off the waitlist once they're let in, or delete their account", async () => {
+    resetAlerts();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("CAPTAIN_MAX_USERS", "8");
+    expect(await members.admit("waiting_3")).toBe(false);
+    const [[, before]] = waitlistAlerts(errors);
+    // A freed place lets waiting_1 in; deleting waiting_2's account takes them off the waitlist too.
+    await members.removeMember("early_a");
+    expect(await members.admit("waiting_1")).toBe(true);
+    await members.removeMember("waiting_2");
+    expect(await members.admit("waiting_4")).toBe(false);
+    const [, [, after]] = waitlistAlerts(errors);
+    // Since waiting_3's alert: waiting_4 joined, waiting_1 and waiting_2 left.
+    expect(after).toBe(before - 1);
+    errors.mockRestore();
   });
 });

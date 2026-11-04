@@ -135,6 +135,13 @@ export const members = sqliteTable("members", {
   joinedAt: integer("joined_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+/** People who signed in past the user cap, recorded so the operator hears about each one once. */
+export const waitlist = sqliteTable("waitlist", {
+  userId: text("user_id").primaryKey(),
+  email: text("email"),
+  joinedAt: integer("joined_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 /** Per-user preferences. Model ids are validated against `MODELS` in `models.ts` when read. */
 export const userSettings = sqliteTable("user_settings", {
   userId: text("user_id").primaryKey(),

@@ -64,7 +64,7 @@ export async function signedInUser(request: Request): Promise<CaptainUser | null
 export async function resolveUser(request: Request): Promise<CaptainUser | null> {
   const user = await signedInUser(request);
   if (!user || !clerkConfigured()) return user;
-  return (await admit(user.id)) ? user : null;
+  return (await admit(user.id, user.email)) ? user : null;
 }
 
 /** The time zone the web app sends with each bot request (`x-captain-time-zone`), if it's a real one. */

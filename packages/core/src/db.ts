@@ -67,6 +67,7 @@ async function migrate(client: ReturnType<typeof createClient>) {
           ]
         : []),
       `CREATE TABLE IF NOT EXISTS members (user_id TEXT PRIMARY KEY, joined_at INTEGER NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS waitlist (user_id TEXT PRIMARY KEY, email TEXT, joined_at INTEGER NOT NULL)`,
       ...(membersTable.rows.length === 0
         ? [
             `INSERT OR IGNORE INTO members (user_id, joined_at)
