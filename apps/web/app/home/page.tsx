@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BambiiLogo } from "@/components/bambii-logo";
 import { Button } from "@/components/ui/button";
-import { AppAvatar, Card, HeroDemo, SectionHeading } from "./_components";
+import { Card, HeroDemo, SectionHeading } from "./_components";
 
 /** The app lives on bambii.ai; this page is served on home.bambii.ai (see proxy.ts). */
 const APP_URL = "https://bambii.ai";
@@ -37,22 +37,6 @@ const PILLARS = [
     title: "Run",
     body: "Launch it in one click. Each app runs from your Mac with its own local data and its own bot you can ask about it or ask to change it.",
   },
-];
-
-const STEPS = [
-  { title: "Describe it", body: "“Build a task tracker from my Slack messages.” Plain words, no spec." },
-  { title: "Bambii looks at real data", body: "It reads the Slack, Gmail or Notion you've connected, so the app fits how you already work." },
-  { title: "It builds and ships", body: "A new version appears as a Launch card in the chat, and the app opens beside it." },
-  { title: "Keep shaping it", body: "Ask app to query its data, or Edit app to go back to Builder and change anything." },
-];
-
-const APPS = [
-  { icon: "✅", name: "Slack Tasks", body: "Every ask from Slack, in one list that stays in sync." },
-  { icon: "📬", name: "Reply Radar", body: "A dashboard of emails waiting on your reply, oldest first." },
-  { icon: "🌱", name: "Habit Tracker", body: "Streaks, check-ins and a weekly review, all on your Mac." },
-  { icon: "📝", name: "Meeting Digest", body: "Notion meeting notes turned into decisions and follow-ups." },
-  { icon: "🤝", name: "Inbox CRM", body: "Contacts and deals pulled from your Gmail threads." },
-  { icon: "📚", name: "Reading Queue", body: "Links from Slack and Notion, sorted into what to read next." },
 ];
 
 const TRUST = [
@@ -93,8 +77,6 @@ export default function HomePage() {
             Bambii
           </a>
           <nav className="hidden items-center gap-5 text-muted-foreground text-sm md:flex">
-            <a className="transition-colors hover:text-foreground" href="#how">How it works</a>
-            <a className="transition-colors hover:text-foreground" href="#apps">Apps</a>
             <a className="transition-colors hover:text-foreground" href="#trust">Connectors</a>
           </nav>
           <Button asChild className="ml-auto" size="sm" variant="outline">
@@ -111,11 +93,11 @@ export default function HomePage() {
               Not just a chat
             </span>
             <h1 className="mt-6 text-balance font-semibold text-4xl tracking-tight sm:text-6xl">
-              An agent that builds the app you need
+              Meet Bambii
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg text-muted-foreground leading-8">
-              Ask Bambii for anything. When an answer isn't enough, it builds a working app for it, wired to your Slack, Gmail
-              and Notion and running on your Mac.
+              She chats and builds with you. Bambii doesn't stop at a reply: when an answer is better seen than read, she
+              turns it into a working app you can use.
             </p>
             <div className="mt-8">
               <CallToAction macUrl={macUrl} />
@@ -141,42 +123,6 @@ export default function HomePage() {
                   </span>
                   <h3 className="mt-4 font-semibold tracking-tight">{title}</h3>
                   <p className="mt-2 text-[15px] text-muted-foreground leading-7">{body}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="scroll-mt-14 py-20" id="how">
-          <div className="mx-auto max-w-6xl px-5 sm:px-6">
-            <SectionHeading eyebrow="How it works" title="From a sentence to a running app" />
-            <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {STEPS.map((step, index) => (
-                <li className="rounded-xl border p-6" key={step.title}>
-                  <span className="font-mono text-muted-foreground text-xs">0{index + 1}</span>
-                  <h3 className="mt-3 font-semibold tracking-tight">{step.title}</h3>
-                  <p className="mt-2 text-[15px] text-muted-foreground leading-7">{step.body}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        <section className="scroll-mt-14 border-t bg-sidebar py-20" id="apps">
-          <div className="mx-auto max-w-6xl px-5 sm:px-6">
-            <SectionHeading
-              eyebrow="A UI for every need"
-              lead="A few things people ask Bambii to build. Yours will look like however you work."
-              title="Apps made to fit you"
-            />
-            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {APPS.map((app) => (
-                <Card className="flex items-start gap-4 p-5" key={app.name}>
-                  <AppAvatar icon={app.icon} seed={app.name} />
-                  <div>
-                    <h3 className="font-medium">{app.name}</h3>
-                    <p className="mt-1 text-muted-foreground text-sm leading-6">{app.body}</p>
-                  </div>
                 </Card>
               ))}
             </div>

@@ -41,5 +41,5 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|eve/|a/|.*\\.(?:css|js|png|jpg|svg|ico|woff2?)$).*)", "/api/(.*)"],
+  matcher: ["/((?!_next|eve/|a/|.*\\.(?:css|js|png|jpg|gif|svg|ico|woff2?)$).*)", "/api/(.*)"],
 };
