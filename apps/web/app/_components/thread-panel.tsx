@@ -3,7 +3,6 @@
 import {
   BotIcon,
   DownloadIcon,
-  FileTextIcon,
   FolderOpenIcon,
   HammerIcon,
   MonitorIcon,
@@ -25,7 +24,7 @@ import type { ChatBot } from "./agent-chat";
 import { APP_ZOOMS, AppRender, type SpaceApp, setAppZoom, useAppZoom } from "./space";
 import { avatarTint, BotGlyph, isBambiiIcon } from "./bot-glyph";
 
-/** Just wide enough for the About form and an A4 preview; the phone preview sizes itself to the height. */
+/** Just wide enough for the About form; the phone preview sizes itself to the height. */
 const PANEL_WIDTH = 340;
 
 /**
@@ -65,7 +64,8 @@ export function ThreadPanel({
   readonly autoHidden?: boolean;
   readonly onClose: () => void;
 }) {
-  const icon = app?.icon ?? bot.icon;
+  // As in the sidebar: an app's own icon only in its app-bot chats; Builder threads keep Builder's.
+  const icon = bot.agent === "app-bot" ? (app?.icon ?? "✨") : bot.icon;
   // Bambii chats are colored by thread, matching their row in the sidebar.
   const tint = avatarTint(icon, isBambiiIcon(icon) ? threadId : avatarSeed);
   const name = app?.name ?? title ?? bot.name;
@@ -355,53 +355,85 @@ function ComputerSection({ botName, streamUrl }: { readonly botName: string; rea
   );
 }
 
-/** Makes every built app's UI smaller or larger; the percentage resets it to normal. */
-function ZoomControl() {
+/** The preview's shape: a phone screen. */
+const PHONE_RATIO = 9 / 19.5;
+
+/**
+ * The bar under the preview: the app's size (for every built app; the percentage resets it), reload,
+ * and its code, downloaded as a zip in a browser or opened in Finder in the Mac app.
+ */
+function RenderControls({ app, onReload }: { readonly app: SpaceApp; readonly onReload: () => void }) {
+  const desktop = useDesktop();
   const zoom = useAppZoom();
   const index = APP_ZOOMS.indexOf(zoom as (typeof APP_ZOOMS)[number]);
   const step = (by: number) => setAppZoom(APP_ZOOMS[Math.min(APP_ZOOMS.length - 1, Math.max(0, index + by))]);
+  const iconButton = "rounded-full text-muted-foreground hover:text-foreground";
+  const codeLabel = desktop ? "Open this app's source code in Finder" : "Download this app's source code as a zip";
   return (
-    <div className="flex items-center text-muted-foreground">
-      <Button
-        aria-label="Make the app smaller"
-        className="rounded-full"
-        disabled={index <= 0}
-        onClick={() => step(-1)}
-        size="icon-xs"
-        title="Make the app smaller"
-        variant="ghost"
-      >
-        <ZoomOutIcon />
+    <div className="mx-auto flex shrink-0 items-center gap-0.5 rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur-md">
+      <div aria-label="App size" className="flex items-center" role="group">
+        <Button
+          aria-label="Make the app smaller"
+          className={iconButton}
+          disabled={index <= 0}
+          onClick={() => step(-1)}
+          size="icon-sm"
+          title="Make the app smaller"
+          variant="ghost"
+        >
+          <ZoomOutIcon />
+        </Button>
+        <button
+          className={cn(
+            "h-7 min-w-12 rounded-full px-2 font-medium text-muted-foreground text-xs tabular-nums transition-colors hover:bg-accent hover:text-foreground",
+            zoom !== 1 && "bg-accent text-foreground",
+          )}
+          onClick={() => setAppZoom(1)}
+          title="Reset to 100%"
+          type="button"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <Button
+          aria-label="Make the app larger"
+          className={iconButton}
+          disabled={index >= APP_ZOOMS.length - 1}
+          onClick={() => step(1)}
+          size="icon-sm"
+          title="Make the app larger"
+          variant="ghost"
+        >
+          <ZoomInIcon />
+        </Button>
+      </div>
+      <span className="mx-0.5 h-4 w-px bg-border" />
+      <Button aria-label="Reload the app" className={iconButton} onClick={onReload} size="icon-sm" title="Reload the app" variant="ghost">
+        <RotateCwIcon />
       </Button>
-      <button
-        className="w-9 text-center font-medium text-xs tabular-nums hover:text-foreground"
-        onClick={() => setAppZoom(1)}
-        title="Reset the app's size"
-        type="button"
-      >
-        {Math.round(zoom * 100)}%
-      </button>
-      <Button
-        aria-label="Make the app larger"
-        className="rounded-full"
-        disabled={index >= APP_ZOOMS.length - 1}
-        onClick={() => step(1)}
-        size="icon-xs"
-        title="Make the app larger"
-        variant="ghost"
-      >
-        <ZoomInIcon />
-      </Button>
+      <span className="mx-0.5 h-4 w-px bg-border" />
+      {desktop ? (
+        <Button
+          aria-label={codeLabel}
+          className={iconButton}
+          onClick={() => desktop.revealApp(app.id, "source")}
+          size="sm"
+          title={codeLabel}
+          variant="ghost"
+        >
+          <FolderOpenIcon />
+          Code
+        </Button>
+      ) : (
+        <Button asChild className={iconButton} size="sm" title={codeLabel} variant="ghost">
+          <a aria-label={codeLabel} download href={`/api/apps/${app.id}/source`}>
+            <DownloadIcon />
+            Code
+          </a>
+        </Button>
+      )}
     </div>
   );
 }
-
-/** Shapes the app can be previewed in: a phone screen, or an A4 page (210 × 297). */
-const FRAMES = {
-  phone: { label: "Phone", ratio: 9 / 19.5, icon: SmartphoneIcon },
-  a4: { label: "A4", ratio: 210 / 297, icon: FileTextIcon },
-} as const;
-type FrameSize = keyof typeof FRAMES;
 
 function ApplicationSections({
   app,
@@ -414,13 +446,12 @@ function ApplicationSections({
   readonly app: SpaceApp | null;
   readonly bot: ChatBot;
   readonly buildThreadId?: string | null;
-  /** On a phone the app fills the sheet: the device is already a phone, so no frame to pick. */
+  /** On a phone the app fills the sheet: the device is already a phone, so no frame around it. */
   readonly fullBleed: boolean;
   readonly tab: "Details" | "Render";
 }) {
   const desktop = useDesktop();
   const [reloadKey, setReloadKey] = useState(0);
-  const [size, setSize] = useState<FrameSize>("phone");
   if (tab === "Details") {
     return (
       <ContextPane
@@ -476,14 +507,13 @@ function ApplicationSections({
       />
     );
   }
-  const frame = FRAMES[size];
   if (fullBleed) {
     return (
       <section className="relative min-h-0 w-full flex-1 border-t bg-card" role="tabpanel">
         {app ? (
           <AppRender app={app} key={`${app.id}@${app.currentVersion}`} reloadKey={reloadKey} />
         ) : (
-          <EmptyState icon={frame.icon}>
+          <EmptyState icon={SmartphoneIcon}>
             Your app will appear here once {bot.agent === "builder" ? bot.name : "it"} builds it.
           </EmptyState>
         )}
@@ -491,73 +521,29 @@ function ApplicationSections({
     );
   }
   return (
-    <Pane caption={app ? `${app.name} · ${frame.label}` : undefined} fill>
-      <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1">
-        {app ? <ZoomControl /> : <span />}
-        <div className="flex gap-1" role="radiogroup">
-          {(Object.keys(FRAMES) as FrameSize[]).map((key) => (
-            <button
-              aria-checked={size === key}
-              className={cn(
-                "rounded-full px-3 py-1 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground",
-                size === key && "bg-accent text-foreground",
-              )}
-              key={key}
-              onClick={() => setSize(key)}
-              role="radio"
-              type="button"
-            >
-              {FRAMES[key].label}
-            </button>
-          ))}
-        </div>
-        {app ? (
-          <div className="flex justify-end">
-            {desktop ? (
-              <Button
-                aria-label="Open this app's source code in Finder"
-                className="rounded-full text-muted-foreground"
-                onClick={() => desktop.revealApp(app.id, "source")}
-                size="icon-xs"
-                title="Open this app's source code in Finder"
-                variant="ghost"
-              >
-                <FolderOpenIcon />
-              </Button>
-            ) : (
-              <Button
-                asChild
-                className="rounded-full text-muted-foreground"
-                size="icon-xs"
-                title="Download this app's source code as a zip"
-                variant="ghost"
-              >
-                <a aria-label="Download this app's source code as a zip" download href={`/api/apps/${app.id}/source`}>
-                  <DownloadIcon />
-                </a>
-              </Button>
-            )}
-          </div>
-        ) : null}
-      </div>
+    <Pane fill>
       {/*
-        The box is as large as the space left allows while keeping its exact shape (cq units read
-        this wrapper's size). No CSS transforms: in the Mac app a native view is laid over it by its bounds.
+        The phone is as large as the space left allows while keeping its shape (cq units read this
+        wrapper's size). No CSS transforms: in the Mac app a native view is laid over the screen by its
+        bounds, with the same 16px corners as the screen.
       */}
       <div className="flex min-h-24 flex-1 justify-center [container-type:size]">
         <div
-          className={cn(card, "relative overflow-hidden")}
-          style={{ width: `min(100cqw, 100cqh * ${frame.ratio})`, aspectRatio: frame.ratio }}
+          className="rounded-[22px] bg-foreground/[0.04] p-1.5 shadow-black/5 shadow-lg ring-1 ring-border"
+          style={{ width: `min(100cqw, 100cqh * ${PHONE_RATIO})`, aspectRatio: PHONE_RATIO }}
         >
-        {app ? (
-          <AppRender app={app} key={`${app.id}@${app.currentVersion}`} reloadKey={reloadKey} />
-        ) : (
-          <EmptyState icon={frame.icon}>
-            Your app will appear here once {bot.agent === "builder" ? bot.name : "it"} builds it.
-          </EmptyState>
-          )}
+          <div className="relative size-full overflow-hidden rounded-2xl bg-card">
+            {app ? (
+              <AppRender app={app} key={`${app.id}@${app.currentVersion}`} reloadKey={reloadKey} />
+            ) : (
+              <EmptyState icon={SmartphoneIcon}>
+                Your app will appear here once {bot.agent === "builder" ? bot.name : "it"} builds it.
+              </EmptyState>
+            )}
+          </div>
         </div>
       </div>
+      {app ? <RenderControls app={app} onReload={() => setReloadKey((k) => k + 1)} /> : null}
     </Pane>
   );
 }
