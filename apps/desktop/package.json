@@ -1,14 +1,15 @@
 {
   "name": "@captain/desktop",
   "productName": "Bambii",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Bambii for Mac",
   "main": "dist/main/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "npm run build && CAPTAIN_URL=${CAPTAIN_URL:-http://localhost:3000} electron .",
-    "dist": "npm run build && electron-builder --mac --publish never"
+    "dist": "npm run build && electron-builder --mac --publish never",
+    "dist:unsigned": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false CAPTAIN_UPDATES_URL=${CAPTAIN_UPDATES_URL:-https://github.com/gg-was-here/captain/releases/latest/download} electron-builder --mac --publish never -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
