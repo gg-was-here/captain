@@ -23,6 +23,8 @@ function homeHostRoute(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   if (pathname === "/") return NextResponse.rewrite(new URL("/home", request.url));
   if (pathname === "/home") return NextResponse.next();
+  // The landing page's own files in public/home/ (e.g. the hero animation's JSON, which the matcher doesn't skip).
+  if (pathname.startsWith("/home/")) return NextResponse.next();
   // Google Search Console's ownership file (in public/) must be served on this host, not redirected.
   if (/^\/google[0-9a-f]+\.html$/.test(pathname)) return NextResponse.next();
   return NextResponse.redirect(new URL(`${pathname}${search}`, "https://bambii.ai"));
