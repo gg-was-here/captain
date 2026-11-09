@@ -29,11 +29,14 @@ export interface CaptainDesktop {
   openSpace(options: { appId: string; version: number; bounds: SpaceBounds }): Promise<void>;
   setSpaceBounds(bounds: SpaceBounds): void;
   reloadSpace(): void;
+  /** Draw the open app's UI larger or smaller (1 = normal). Missing in Mac app versions before it existed. */
+  setSpaceZoom?(factor: number): void;
   closeSpace(): void;
   readAppData(appId: string): Promise<Record<string, AppRecord[]>>;
   applyAppChanges(appId: string, changes: AppDataChange[]): Promise<void>;
   installedApps(): Promise<{ appId: string; version: number; sizeBytes: number }[]>;
-  revealApp(appId: string): void;
+  /** Show the app's folder in Finder, or with "source" open its source code (older Mac apps show the folder). */
+  revealApp(appId: string, target?: "source"): void;
   /** Delete an app and its on-device data from this Mac. Missing in Mac app versions before it existed. */
   removeApp?(appId: string): Promise<void>;
 }

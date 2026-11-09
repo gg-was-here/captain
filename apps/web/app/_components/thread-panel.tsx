@@ -1,6 +1,18 @@
 "use client";
 
-import { BotIcon, DownloadIcon, FileTextIcon, HammerIcon, MonitorIcon, RotateCwIcon, SmartphoneIcon, XIcon } from "lucide-react";
+import {
+  BotIcon,
+  DownloadIcon,
+  FileTextIcon,
+  FolderOpenIcon,
+  HammerIcon,
+  MonitorIcon,
+  RotateCwIcon,
+  SmartphoneIcon,
+  XIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
@@ -10,7 +22,7 @@ import { useDesktop } from "@/lib/client/desktop";
 import { COMPACT_QUERY, useIsMobile, useMediaQuery } from "@/lib/client/use-mobile";
 import { cn, roundButton } from "@/lib/utils";
 import type { ChatBot } from "./agent-chat";
-import { AppRender, type SpaceApp } from "./space";
+import { APP_ZOOMS, AppRender, type SpaceApp, setAppZoom, useAppZoom } from "./space";
 import { avatarTint, BotGlyph, isBambiiIcon } from "./bot-glyph";
 
 /** Just wide enough for the About form and an A4 preview; the phone preview sizes itself to the height. */
@@ -343,6 +355,47 @@ function ComputerSection({ botName, streamUrl }: { readonly botName: string; rea
   );
 }
 
+/** Makes every built app's UI smaller or larger; the percentage resets it to normal. */
+function ZoomControl() {
+  const zoom = useAppZoom();
+  const index = APP_ZOOMS.indexOf(zoom as (typeof APP_ZOOMS)[number]);
+  const step = (by: number) => setAppZoom(APP_ZOOMS[Math.min(APP_ZOOMS.length - 1, Math.max(0, index + by))]);
+  return (
+    <div className="flex items-center text-muted-foreground">
+      <Button
+        aria-label="Make the app smaller"
+        className="rounded-full"
+        disabled={index <= 0}
+        onClick={() => step(-1)}
+        size="icon-xs"
+        title="Make the app smaller"
+        variant="ghost"
+      >
+        <ZoomOutIcon />
+      </Button>
+      <button
+        className="w-9 text-center font-medium text-xs tabular-nums hover:text-foreground"
+        onClick={() => setAppZoom(1)}
+        title="Reset the app's size"
+        type="button"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <Button
+        aria-label="Make the app larger"
+        className="rounded-full"
+        disabled={index >= APP_ZOOMS.length - 1}
+        onClick={() => step(1)}
+        size="icon-xs"
+        title="Make the app larger"
+        variant="ghost"
+      >
+        <ZoomInIcon />
+      </Button>
+    </div>
+  );
+}
+
 /** Shapes the app can be previewed in: a phone screen, or an A4 page (210 × 297). */
 const FRAMES = {
   phone: { label: "Phone", ratio: 9 / 19.5, icon: SmartphoneIcon },
@@ -395,6 +448,18 @@ function ApplicationSections({
                   Download code
                 </a>
               </Button>
+              {desktop ? (
+                <Button
+                  className="rounded-full"
+                  onClick={() => desktop.revealApp(app.id, "source")}
+                  size="sm"
+                  title="Open this app's source code in Finder"
+                  variant="outline"
+                >
+                  <FolderOpenIcon className="size-4" />
+                  Show code
+                </Button>
+              ) : null}
               <Button className="rounded-full" onClick={() => setReloadKey((k) => k + 1)} size="sm" variant="outline">
                 <RotateCwIcon className="size-4" />
                 Reload
@@ -427,22 +492,53 @@ function ApplicationSections({
   }
   return (
     <Pane caption={app ? `${app.name} · ${frame.label}` : undefined} fill>
-      <div className="flex shrink-0 justify-center gap-1" role="radiogroup">
-        {(Object.keys(FRAMES) as FrameSize[]).map((key) => (
-          <button
-            aria-checked={size === key}
-            className={cn(
-              "rounded-full px-3 py-1 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground",
-              size === key && "bg-accent text-foreground",
+      <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1">
+        {app ? <ZoomControl /> : <span />}
+        <div className="flex gap-1" role="radiogroup">
+          {(Object.keys(FRAMES) as FrameSize[]).map((key) => (
+            <button
+              aria-checked={size === key}
+              className={cn(
+                "rounded-full px-3 py-1 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground",
+                size === key && "bg-accent text-foreground",
+              )}
+              key={key}
+              onClick={() => setSize(key)}
+              role="radio"
+              type="button"
+            >
+              {FRAMES[key].label}
+            </button>
+          ))}
+        </div>
+        {app ? (
+          <div className="flex justify-end">
+            {desktop ? (
+              <Button
+                aria-label="Open this app's source code in Finder"
+                className="rounded-full text-muted-foreground"
+                onClick={() => desktop.revealApp(app.id, "source")}
+                size="icon-xs"
+                title="Open this app's source code in Finder"
+                variant="ghost"
+              >
+                <FolderOpenIcon />
+              </Button>
+            ) : (
+              <Button
+                asChild
+                className="rounded-full text-muted-foreground"
+                size="icon-xs"
+                title="Download this app's source code as a zip"
+                variant="ghost"
+              >
+                <a aria-label="Download this app's source code as a zip" download href={`/api/apps/${app.id}/source`}>
+                  <DownloadIcon />
+                </a>
+              </Button>
             )}
-            key={key}
-            onClick={() => setSize(key)}
-            role="radio"
-            type="button"
-          >
-            {FRAMES[key].label}
-          </button>
-        ))}
+          </div>
+        ) : null}
       </div>
       {/*
         The box is as large as the space left allows while keeping its exact shape (cq units read

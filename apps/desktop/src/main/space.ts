@@ -106,6 +106,8 @@ export interface Bounds {
 export class SpaceManager {
   private view?: WebContentsView;
   private appId?: string;
+  /** How large the app's UI is drawn, chosen in Bambii's Render tab. Kept across apps and reloads. */
+  private zoom = 1;
   /** Increments on every open/close so a superseded open stops quietly. */
   private generation = 0;
   /** Cooldowns after the user cancels an app's send/post requests, for the life of this window. */
@@ -157,6 +159,8 @@ export class SpaceManager {
     this.window.contentView.addChildView(view);
     view.setBounds(bounds);
     view.setBorderRadius(CORNER_RADIUS);
+    // Reapplied on every load: a reload or in-app navigation would otherwise reset it.
+    view.webContents.on("did-finish-load", () => view.webContents.setZoomFactor(this.zoom));
     this.view = view;
     this.appId = appId;
     try {
@@ -170,6 +174,12 @@ export class SpaceManager {
 
   setBounds(bounds: Bounds) {
     this.view?.setBounds(bounds);
+  }
+
+  setZoom(factor: unknown) {
+    if (typeof factor !== "number" || !Number.isFinite(factor)) return;
+    this.zoom = Math.min(2, Math.max(0.5, factor));
+    if (this.view && !this.view.webContents.isDestroyed()) this.view.webContents.setZoomFactor(this.zoom);
   }
 
   reload() {

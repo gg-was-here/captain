@@ -13,10 +13,11 @@ contextBridge.exposeInMainWorld("captainDesktop", {
   openSpace: (options: { appId: string; version: number; bounds: Bounds }) => ipcRenderer.invoke("space:open", options),
   setSpaceBounds: (bounds: Bounds) => ipcRenderer.send("space:bounds", bounds),
   reloadSpace: () => ipcRenderer.send("space:reload"),
+  setSpaceZoom: (factor: number) => ipcRenderer.send("space:zoom", factor),
   closeSpace: () => ipcRenderer.send("space:close"),
   readAppData: (appId: string) => ipcRenderer.invoke("apps:read-data", appId),
   applyAppChanges: (appId: string, changes: unknown[]) => ipcRenderer.invoke("apps:apply-changes", appId, changes),
   installedApps: () => ipcRenderer.invoke("apps:installed"),
-  revealApp: (appId: string) => ipcRenderer.send("apps:reveal", appId),
+  revealApp: (appId: string, target?: "source") => ipcRenderer.send("apps:reveal", appId, target),
   removeApp: (appId: string) => ipcRenderer.invoke("apps:remove", appId),
 });

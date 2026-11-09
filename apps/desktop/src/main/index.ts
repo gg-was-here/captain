@@ -177,6 +177,10 @@ ipcMain.on("space:reload", (event) => {
   if (!isFromCaptain(event)) return;
   space?.reload();
 });
+ipcMain.on("space:zoom", (event, factor: unknown) => {
+  if (!isFromCaptain(event)) return;
+  space?.setZoom(factor);
+});
 ipcMain.on("space:close", (event) => {
   if (!isFromCaptain(event)) return;
   space?.close();
@@ -199,9 +203,12 @@ ipcMain.handle("apps:remove", async (event, appId: string) => {
   await store.removeApp(appId);
   await clearAppSession(appId);
 });
-ipcMain.on("apps:reveal", (event, appId: string) => {
+// `target: "source"` opens the installed version's source code; otherwise the app's folder is shown.
+ipcMain.on("apps:reveal", async (event, appId: string, target?: unknown) => {
   if (!isFromCaptain(event)) return;
-  shell.showItemInFolder(join(store.appDir(appId), "manifest.json"));
+  const source = target === "source" ? await store.sourceDir(appId) : null;
+  if (source) void shell.openPath(source);
+  else shell.showItemInFolder(join(store.appDir(appId), "manifest.json"));
 });
 // Built apps' window.captain calls, answered by whichever Space is open. Registered once: a second
 // registration throws, which broke the bridge when the window was reopened from the Dock.

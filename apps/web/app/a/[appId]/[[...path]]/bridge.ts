@@ -22,13 +22,16 @@ export const BRIDGE_SCRIPT = `(() => {
       send({ captain: "call", id, method, args });
     });
   const onPortMessage = (event) => {
-    const { captain, id, result, error, collection } = event.data || {};
+    const { captain, id, result, error, collection, value } = event.data || {};
     if (captain === "result" && pending.has(id)) {
       const { resolve, reject } = pending.get(id);
       pending.delete(id);
       error === undefined ? resolve(result) : reject(new Error(error));
     } else if (captain === "dataChanged") {
       for (const listener of listeners) listener(collection);
+    } else if (captain === "zoom" && typeof value === "number" && isFinite(value)) {
+      // The size the user picked in Bambii: CSS zoom scales every element and keeps the layout fitting the frame.
+      document.documentElement.style.zoom = String(Math.min(2, Math.max(0.5, value)));
     }
   };
   // The app can start before the Bambii page is listening (the iframe is server-rendered), so keep

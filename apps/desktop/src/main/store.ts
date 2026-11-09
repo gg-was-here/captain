@@ -60,6 +60,13 @@ export async function readManifest(appId: string): Promise<AppManifest | null> {
   }
 }
 
+/** The installed version's source folder, or null if the app isn't installed or has none. */
+export async function sourceDir(appId: string) {
+  const manifest = await readManifest(appId);
+  const dir = manifest && join(appDir(appId), `v${manifest.version}`, "source");
+  return dir && existsSync(dir) ? dir : null;
+}
+
 export function isInstalled(appId: string, version: number) {
   return existsSync(join(appDir(appId), `v${version}`, "dist", "index.html"));
 }

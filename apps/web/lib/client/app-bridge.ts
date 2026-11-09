@@ -16,11 +16,13 @@ const writeGuard = new WriteGuard();
  *
  * The frame can't open windows. A link the user clicks in the app reaches `onOpenLink`, and Bambii
  * shows the address with its own Open button.
+ *
+ * `zoom` is how large the app draws its UI (1 = normal); `setZoom` changes it without reloading the app.
  */
 export function serveAppBridge(
   frame: HTMLIFrameElement,
   app: { id: string; name: string },
-  { onLeft, onOpenLink }: { onLeft: () => void; onOpenLink: (url: string) => void },
+  { onLeft, onOpenLink, zoom }: { onLeft: () => void; onOpenLink: (url: string) => void; zoom: number },
 ) {
   const runtime = async (kind: "ai" | "connectors", body: Record<string, unknown>, confirmed = false): Promise<any> => {
     const response = await fetch(`/api/runtime/${kind}`, {
@@ -86,6 +88,7 @@ export function serveAppBridge(
     port.onmessage = (message) => void serve(message);
     frame.contentWindow?.postMessage({ captain: "ready" }, "*", [channel.port2]);
     state = "connected";
+    if (zoom !== 1) port.postMessage({ captain: "zoom", value: zoom });
   };
 
   // The first load is the document Bambii put in the frame; any later one is another document.
@@ -102,10 +105,16 @@ export function serveAppBridge(
   const stopDataChanged = onAppDataChanged((appId, collection) => {
     if (appId === app.id) port?.postMessage({ captain: "dataChanged", collection });
   });
-  return () => {
-    window.removeEventListener("message", onMessage);
-    frame.removeEventListener("load", onLoad);
-    stopDataChanged();
-    port?.close();
+  return {
+    setZoom(value: number) {
+      zoom = value;
+      port?.postMessage({ captain: "zoom", value });
+    },
+    close() {
+      window.removeEventListener("message", onMessage);
+      frame.removeEventListener("load", onLoad);
+      stopDataChanged();
+      port?.close();
+    },
   };
 }

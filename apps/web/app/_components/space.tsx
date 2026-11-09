@@ -1,7 +1,7 @@
 "use client";
 
 import type { App } from "@captain/core/schema";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { serveAppBridge } from "@/lib/client/app-bridge";
@@ -13,6 +13,44 @@ export type SpaceApp = Pick<App, "id" | "name" | "icon" | "description" | "curre
 export const SpaceContext = createContext<{ open(app: SpaceApp): void }>({ open() {} });
 export const useSpace = () => useContext(SpaceContext);
 
+/** Sizes a built app's UI can be drawn at, picked in the Render tab. One setting for every app. */
+export const APP_ZOOMS = [0.75, 0.9, 1, 1.1, 1.25, 1.5] as const;
+const ZOOM_KEY = "bambii:app-zoom";
+const zoomListeners = new Set<() => void>();
+
+function readZoom() {
+  try {
+    const value = Number(localStorage.getItem(ZOOM_KEY));
+    return (APP_ZOOMS as readonly number[]).includes(value) ? value : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function setAppZoom(value: number) {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(value));
+  } catch {}
+  for (const listener of zoomListeners) listener();
+}
+
+/** How large built apps draw their UI (1 = normal), kept in this browser. */
+export function useAppZoom() {
+  return useSyncExternalStore(
+    (listener) => {
+      zoomListeners.add(listener);
+      const onStorage = (event: StorageEvent) => event.key === ZOOM_KEY && listener();
+      window.addEventListener("storage", onStorage);
+      return () => {
+        zoomListeners.delete(listener);
+        window.removeEventListener("storage", onStorage);
+      };
+    },
+    readZoom,
+    () => 1,
+  );
+}
+
 /**
  * Where a built app runs, inside the side panel's phone frame. In the Mac app
  * the app is a native view loaded from disk, positioned over the placeholder
@@ -21,6 +59,11 @@ export const useSpace = () => useContext(SpaceContext);
  */
 export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; readonly reloadKey?: number }) {
   const desktop = useDesktop();
+  const zoom = useAppZoom();
+  // Read when a frame's bridge starts, so a new frame opens at the current size.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const bridgeRef = useRef<ReturnType<typeof serveAppBridge>>(undefined);
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -45,7 +88,10 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
     setState("loading");
     desktop
       .openSpace({ appId: app.id, version: app.currentVersion, bounds: bounds() })
-      .then(() => setState("ready"))
+      .then(() => {
+        desktop.setSpaceZoom?.(zoomRef.current);
+        setState("ready");
+      })
       .catch((e: unknown) => {
         setError(desktopErrorText(e));
         setState("error");
@@ -68,11 +114,22 @@ export function AppRender({ app, reloadKey = 0 }: { readonly app: SpaceApp; read
 
   useEffect(() => {
     if (desktop !== null || !frameRef.current) return;
-    return serveAppBridge(frameRef.current, app, {
+    const bridge = serveAppBridge(frameRef.current, app, {
       onLeft: () => setFrameKey((key) => key + 1),
       onOpenLink: setLink,
+      zoom: zoomRef.current,
     });
+    bridgeRef.current = bridge;
+    return () => {
+      bridge.close();
+      if (bridgeRef.current === bridge) bridgeRef.current = undefined;
+    };
   }, [desktop, app.id, app.name, app.currentVersion, reloadKey, frameKey]);
+
+  useEffect(() => {
+    if (desktop) desktop.setSpaceZoom?.(zoom);
+    else bridgeRef.current?.setZoom(zoom);
+  }, [desktop, zoom]);
 
   return (
     <div className="relative size-full" ref={hostRef}>
