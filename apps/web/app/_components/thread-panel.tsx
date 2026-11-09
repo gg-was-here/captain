@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, FileTextIcon, HammerIcon, MonitorIcon, RotateCwIcon, SmartphoneIcon, XIcon } from "lucide-react";
+import { BotIcon, DownloadIcon, FileTextIcon, HammerIcon, MonitorIcon, RotateCwIcon, SmartphoneIcon, XIcon } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
@@ -389,6 +389,12 @@ function ApplicationSections({
                   </Link>
                 </Button>
               ) : null}
+              <Button asChild className="rounded-full" size="sm" title="Download this app's source code as a zip" variant="outline">
+                <a download href={`/api/apps/${app.id}/source`}>
+                  <DownloadIcon className="size-4" />
+                  Download code
+                </a>
+              </Button>
               <Button className="rounded-full" onClick={() => setReloadKey((k) => k + 1)} size="sm" variant="outline">
                 <RotateCwIcon className="size-4" />
                 Reload
