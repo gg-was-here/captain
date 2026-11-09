@@ -96,8 +96,8 @@ const THREADS: MockThread[] = [
     id: "inbox",
     title: "Inbox Digest",
     preview: "Your Slack and Gmail, in one list",
-    icon: "📬",
-    seed: "app-botinbox",
+    icon: BAMBII,
+    seed: "mock-blue-1",
     app: "inbox",
     messages: [
       { from: "user", text: "Every morning, show me what needs a reply across Slack and Gmail" },
@@ -112,8 +112,8 @@ const THREADS: MockThread[] = [
     id: "spend",
     title: "Spend",
     preview: "Monthly spending at a glance",
-    icon: BUILDER,
-    seed: "builder",
+    icon: BAMBII,
+    seed: "mock-amber-18",
     app: "spend",
     messages: [
       { from: "user", text: "Build me something that shows where my money went this month, from my email receipts" },
@@ -191,11 +191,14 @@ export function HeroMock() {
           <span className="size-2.5 rounded-full bg-foreground/15" />
           <span className="size-2.5 rounded-full bg-foreground/15" />
         </span>
-        <span className="ml-2 font-medium">Bambii</span>
+        <span className="ml-2 flex items-center gap-1.5 font-medium">
+          <BambiiLogo className="size-4" title="" />
+          Bambii
+        </span>
         <span className="ml-auto text-muted-foreground text-xs">Click around, it works</span>
       </div>
 
-      <div className="relative flex h-[600px] text-left">
+      <div className="relative flex h-[680px] text-left sm:h-[760px]">
         <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar sm:flex">
           <div aria-hidden className="flex h-14 items-center justify-end gap-2 px-3">
             <span className={roundButton}>

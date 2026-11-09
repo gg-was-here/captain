@@ -16,8 +16,9 @@ export function HeroLottie() {
   useEffect(() => setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches), []);
 
   // The box sets the size: lottie-react's own width/height rules sit in a cascade layer that outranks Tailwind's utilities.
+  // The deer is drawn in black, so dark mode inverts it to white.
   return (
-    <div aria-hidden className="mx-auto size-24 sm:size-28">
+    <div aria-hidden className="mx-auto size-24 sm:size-28 dark:invert">
       {reducedMotion === null ? null : (
         <LottieSvg
           autoplay
