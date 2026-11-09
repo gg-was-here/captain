@@ -20,6 +20,8 @@ export const metadata: Metadata = {
     url: "https://home.bambii.ai",
     siteName: "Bambii",
     type: "website",
+    // Setting openGraph here replaces the root layout's, so the shared preview (app/opengraph-image.png) is named again.
+    images: [{ url: "/opengraph-image.png", width: 1200, height: 630, alt: "Meet Bambii — your AI agent that builds" }],
   },
 };
 
