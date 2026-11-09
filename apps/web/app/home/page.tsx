@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BambiiLogo } from "@/components/bambii-logo";
 import { Button } from "@/components/ui/button";
-import { Card, HeroDemo, SectionHeading } from "./_components";
+import { Card, SectionHeading } from "./_components";
 import { HeroLottie } from "./hero-lottie";
+import { HeroMock } from "./hero-mock";
 
 /** The app lives on bambii.ai; this page is served on home.bambii.ai (see proxy.ts). */
 const APP_URL = "https://bambii.ai";
@@ -119,7 +120,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-14 sm:mt-16">
-            <HeroDemo />
+            <HeroMock />
           </div>
         </section>
 
