@@ -72,6 +72,7 @@ export function ThreadView({
         archive={archive}
         avatarSeed={bot.agent + (appId ?? spaceApp?.id ?? "")}
         bot={bot}
+        dataAppId={bot.agent === "builder" ? spaceApp?.id : undefined}
         instructions={instructions}
         key={`${bot.agent}:${initialThreadId ?? "new"}:${appId ?? ""}`}
         onAppBuilt={onAppBuilt}

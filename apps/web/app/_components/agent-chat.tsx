@@ -90,6 +90,7 @@ export function AgentChat({
   title,
   archive,
   avatarSeed,
+  dataAppId,
 }: {
   readonly bot: ChatBot;
   /** The bot's avatar seed, as the sidebar and side panel use it (Bambii chats are colored by thread instead). */
@@ -100,6 +101,8 @@ export function AgentChat({
   readonly sessionId?: string;
   /** For app-bot threads: the app this bot belongs to. */
   readonly appId?: string;
+  /** For Builder threads: the app built here, whose data Builder can also see and change. */
+  readonly dataAppId?: string;
   readonly onAppBuilt?: (app: BuiltApp) => void;
   /** Called once a new thread is saved on its first message. */
   readonly onThreadCreated?: (threadId: string) => void;
@@ -378,12 +381,14 @@ export function AgentChat({
     // Existing threads get the preview now; a new thread carries it in its create request.
     savePreview(latestText.current);
     if (agent.session !== undefined) ensureThread(agent.session.sessionId, true);
-    // An app's bot sees the app's on-device data on every turn; it never leaves the device otherwise.
+    // An app's bot, and the Builder thread that made the app, see its on-device data on every turn; it never
+    // leaves the device otherwise.
     // A new Builder thread carries the name the user picked for the app.
     // The user's extra instructions for this thread ride along with every message.
+    const dataApp = appId ?? dataAppId;
     const clientContext = [
-      appId
-        ? await appContext(appId)
+      dataApp
+        ? await appContext(dataApp)
         : bot.agent === "builder" && title && isEmpty
           ? `The user named this application "${title}". Use exactly that as the app name.`
           : undefined,
@@ -449,7 +454,7 @@ export function AgentChat({
   );
 
   return (
-    <ThreadAppContext.Provider value={appId}>
+    <ThreadAppContext.Provider value={appId ?? dataAppId}>
     <main
       className={cn("relative flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground", bubble.className)}
       style={bubble.style}
