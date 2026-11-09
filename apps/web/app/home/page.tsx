@@ -1,9 +1,10 @@
-import { ArrowRight, Laptop, Bot, Hammer, Lock, MessageSquare, MonitorPlay, ShieldCheck, HardDrive } from "lucide-react";
+import { ArrowRight, ChevronDown, Hammer, Laptop, MessageSquare, MonitorPlay } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BambiiLogo } from "@/components/bambii-logo";
 import { Button } from "@/components/ui/button";
 import { Card, HeroDemo, SectionHeading } from "./_components";
+import { HeroLottie } from "./hero-lottie";
 
 /** The app lives on bambii.ai; this page is served on home.bambii.ai (see proxy.ts). */
 const APP_URL = "https://bambii.ai";
@@ -39,10 +40,27 @@ const PILLARS = [
   },
 ];
 
-const TRUST = [
-  { icon: Lock, title: "Only what you approve", body: "Each app reaches only the connectors you allowed for it." },
-  { icon: ShieldCheck, title: "You confirm every write", body: "Sending, posting or editing asks you first, every time." },
-  { icon: HardDrive, title: "Your data stays local", body: "App data lives in SQLite on your Mac, not in someone's cloud." },
+const FAQ = [
+  {
+    question: "What is Bambii?",
+    answer: "An assistant that chats and builds with you. Ask it anything, and when an answer is better seen than read, it builds a working React app for it.",
+  },
+  {
+    question: "Which tools does it work with?",
+    answer: "Slack, Gmail and Notion. Connect them once in Settings; Bambii and the apps it builds use your own accounts, never a shared one.",
+  },
+  {
+    question: "Can it send or edit things without asking?",
+    answer: "No. Sending, posting or editing always asks you to confirm first, every time.",
+  },
+  {
+    question: "What can an app it builds access?",
+    answer: "Only the connectors you approved for that app, nothing else.",
+  },
+  {
+    question: "Where does my app data live?",
+    answer: "In SQLite on your Mac, not in someone's cloud.",
+  },
 ];
 
 function CallToAction({ macUrl }: { readonly macUrl?: string }) {
@@ -77,7 +95,7 @@ export default function HomePage() {
             Bambii
           </a>
           <nav className="hidden items-center gap-5 text-muted-foreground text-sm md:flex">
-            <a className="transition-colors hover:text-foreground" href="#trust">Connectors</a>
+            <a className="transition-colors hover:text-foreground" href="#faq">FAQ</a>
           </nav>
           <Button asChild className="ml-auto" size="sm" variant="outline">
             <a href={APP_URL}>Open app</a>
@@ -88,10 +106,7 @@ export default function HomePage() {
       <main id="top">
         <section className="mx-auto max-w-6xl px-5 pt-16 pb-20 sm:px-6 sm:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-muted-foreground text-xs shadow-xs">
-              <Bot className="size-3.5" />
-              Not just a chat
-            </span>
+            <HeroLottie />
             <h1 className="mt-6 text-balance font-semibold text-4xl tracking-tight sm:text-6xl">
               Meet Bambii
             </h1>
@@ -129,47 +144,21 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="scroll-mt-14 py-20" id="trust">
-          <div className="mx-auto max-w-6xl px-5 sm:px-6">
-            <SectionHeading
-              eyebrow="Connectors"
-              lead="Connect once in Settings. Bambii and the apps it builds use your accounts, never a shared one."
-              title="Works with Slack, Gmail and Notion"
-            />
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
-              {TRUST.map(({ icon: Icon, title, body }) => (
-                <div className="flex items-start gap-3" key={title}>
-                  <Icon className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-medium">{title}</h3>
-                    <p className="mt-1 text-muted-foreground text-sm leading-6">{body}</p>
-                  </div>
-                </div>
+        <section className="scroll-mt-14 py-20" id="faq">
+          <div className="mx-auto max-w-3xl px-5 sm:px-6">
+            <SectionHeading eyebrow="FAQ" title="Questions, answered" />
+            <div className="mt-12 space-y-3">
+              {FAQ.map(({ question, answer }) => (
+                <Card key={question}>
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-medium [&::-webkit-details-marker]:hidden">
+                      {question}
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                    </summary>
+                    <p className="px-5 pb-5 text-[15px] text-muted-foreground leading-7">{answer}</p>
+                  </details>
+                </Card>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="px-5 pb-20 sm:px-6">
-          <div className="mx-auto max-w-6xl rounded-2xl bg-primary px-6 py-14 text-center text-primary-foreground sm:py-16">
-            <BambiiLogo className="mx-auto size-10" title="" />
-            <h2 className="mt-5 text-balance font-semibold text-3xl tracking-tight sm:text-4xl">What do you need today?</h2>
-            <p className="mx-auto mt-3 max-w-xl text-primary-foreground/70">Tell Bambii. It'll build it.</p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg" variant="secondary">
-                <a href={`${APP_URL}/sign-up`}>
-                  Start building
-                  <ArrowRight />
-                </a>
-              </Button>
-              {macUrl ? (
-                <Button asChild className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground" size="lg" variant="ghost">
-                  <a href={macUrl}>
-                    <Laptop />
-                    Download for Mac
-                  </a>
-                </Button>
-              ) : null}
             </div>
           </div>
         </section>
